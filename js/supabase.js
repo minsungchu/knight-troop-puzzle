@@ -88,6 +88,7 @@ export async function signOut(quiet) {
    실시간 알림을 놓쳤을 때를 대비해 중요한 동작 직전에 DB 값을 한 번 더 대조한다. */
 
 let sessionChannel = null;
+let sessionReady = null;      // 진행 중이거나 끝난 구독 (Promise<boolean>)
 const kickListeners = [];
 /** 다른 기기에 밀려났을 때 호출된다. */
 export function onKicked(fn) { kickListeners.push(fn); }
@@ -109,11 +110,14 @@ export async function claimSession() {
   }
 }
 
-/** 내 계정 채널을 구독한다. SUBSCRIBED 가 확인되면 true. */
+/** 내 계정 채널을 구독한다. SUBSCRIBED 가 확인되면 true 로 풀리는 약속을 돌려준다.
+    refresh() 와 claimSession() 이 앞뒤로 부르므로, 진행 중인 구독을 공유해야
+    두 번째 호출이 '채널은 있는데 아직 안 붙은' 상태를 실패로 읽지 않는다. */
 function watchSession() {
-  return client().then((sb) => {
+  if (sessionReady) return sessionReady;
+
+  sessionReady = client().then((sb) => {
     if (!sb || !uid()) return false;
-    if (sessionChannel) return sessionChannel.__ready || false;
 
     const ch = sb.channel(`user:${uid()}`, { config: { broadcast: { self: false } } });
     sessionChannel = ch;
@@ -123,7 +127,7 @@ function watchSession() {
 
     return new Promise((resolve) => {
       let settled = false;
-      const done = (ok) => { if (!settled) { settled = true; ch.__ready = ok; resolve(ok); } };
+      const done = (ok) => { if (!settled) { settled = true; resolve(ok); } };
       // 구독이 끝내 안 되어도 로그인을 붙잡아 두지 않는다
       setTimeout(() => done(false), 5000);
       ch.subscribe((status) => {
@@ -132,10 +136,13 @@ function watchSession() {
       });
     });
   });
+
+  return sessionReady;
 }
 
 function unwatchSession() {
   if (sessionChannel) { sessionChannel.unsubscribe(); sessionChannel = null; }
+  sessionReady = null;      // 다음 로그인은 새로 구독해야 한다
 }
 
 function kicked() {
