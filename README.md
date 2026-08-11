@@ -71,6 +71,9 @@ open http://localhost:8000
 대시보드 **SQL Editor** 에 [`supabase/schema.sql`](supabase/schema.sql) 전체를 붙여넣고 실행한다.
 여러 번 실행해도 안전하다.
 
+`schema.sql` 에는 최신 내용이 다 들어 있으므로 **새 프로젝트는 이것만 실행하면 된다.**
+이미 예전 `schema.sql` 로 만들어 둔 프로젝트라면 `supabase/patch-*.sql` 을 번호 순서대로 실행한다.
+
 ### 3. 이메일 확인 끄기 ⚠️
 
 **Authentication → Sign In / Providers → Email** 에서 **Confirm email 을 반드시 끈다.**
