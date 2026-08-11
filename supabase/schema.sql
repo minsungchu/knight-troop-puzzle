@@ -26,8 +26,34 @@ alter table public.profiles enable row level security;
 
 drop policy if exists profiles_read   on public.profiles;
 drop policy if exists profiles_update on public.profiles;
-create policy profiles_read   on public.profiles for select using (true);
-create policy profiles_update on public.profiles for update using (auth.uid() = id);
+create policy profiles_read on public.profiles for select using (true);
+-- UPDATE 정책은 두지 않는다. 이름을 바꾸면 이미 올라간 랭킹 기록과 어긋나고,
+-- session_token 갱신은 claim_session() 이 맡는다.
+
+-- session_token 은 밖으로 나가면 안 되므로 읽을 수 있는 열을 좁힌다.
+-- (열 단위 REVOKE 는 테이블 단위 GRANT 가 살아 있으면 효과가 없으므로 먼저 거둔다)
+revoke select on public.profiles from anon, authenticated;
+grant  select (id, username, created_at) on public.profiles to anon, authenticated;
+
+-- 이 기기를 '현재 자리'로 등록한다
+create or replace function public.claim_session(p_token uuid)
+returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  if auth.uid() is null then raise exception '로그인이 필요합니다'; end if;
+  update public.profiles set session_token = p_token where id = auth.uid();
+end $$;
+
+-- 이 기기가 아직 유효한 자리인지 서버에서 대조한다 (토큰 값은 밖으로 나가지 않는다)
+create or replace function public.session_ok(p_token uuid)
+returns boolean
+language sql stable security definer set search_path = '' as $$
+  select coalesce((
+    select p.session_token is null or p.session_token = p_token
+    from public.profiles p
+    where p.id = auth.uid()
+  ), false);
+$$;
 
 -- 가입하면 프로필을 자동으로 만든다
 create or replace function public.handle_new_user()
@@ -383,5 +409,7 @@ grant execute on function public.start_room(uuid, text, text) to authenticated;
 grant execute on function public.finish_room(uuid, int, int) to authenticated;
 grant execute on function public.leave_room(uuid)           to authenticated;
 grant execute on function public.my_room()                  to authenticated;
+grant execute on function public.claim_session(uuid)        to authenticated;
+grant execute on function public.session_ok(uuid)           to authenticated;
 
 revoke execute on function public.handle_new_user() from public;

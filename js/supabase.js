@@ -54,13 +54,14 @@ export async function refresh() {
 
   if (!me.user) { me.profile = null; fireAuth(); return me; }
 
+  // session_token 은 서버 밖으로 나오지 않는다 — 대조는 session_ok() 가 한다
   const { data: p, error } = await sb
-    .from("profiles").select("id, username, session_token").eq("id", me.user.id).single();
+    .from("profiles").select("id, username").eq("id", me.user.id).single();
 
   if (error) {
     // 가입 트리거가 프로필을 만들기 전일 수 있다 — 잠깐 뒤 한 번 더
     await new Promise((r) => setTimeout(r, 700));
-    const retry = await sb.from("profiles").select("id, username, session_token").eq("id", me.user.id).single();
+    const retry = await sb.from("profiles").select("id, username").eq("id", me.user.id).single();
     me.profile = retry.data || null;
   } else {
     me.profile = p;
@@ -95,9 +96,11 @@ export function onKicked(fn) { kickListeners.push(fn); }
 export async function claimSession() {
   const sb = await client();
   if (!sb || !uid()) return;
-  const token = (crypto.randomUUID && crypto.randomUUID()) || String(Math.random()).slice(2) + Date.now();
+  const token = crypto.randomUUID();
   Store.set(SESSION_KEY, token);
-  await sb.from("profiles").update({ session_token: token }).eq("id", uid());
+  // 동시접속 제한은 편의 기능이다 — 실패해도 로그인 자체를 막지 않는다
+  const { error } = await sb.rpc("claim_session", { p_token: token });
+  if (error) console.warn("[supabase] 자리 등록 실패", error);
   await watchSession();
   if (sessionChannel) {
     sessionChannel.send({ type: "broadcast", event: "claim", payload: { token } });
@@ -123,13 +126,19 @@ function kicked() {
   signOut(true);
 }
 
-/** 중요한 쓰기 직전에 이 기기가 아직 유효한 자리인지 확인한다. */
+/** 중요한 쓰기 직전에 이 기기가 아직 유효한 자리인지 확인한다.
+    대조는 서버가 하고 토큰 값 자체는 돌려주지 않는다. */
 export async function sessionValid() {
   const sb = await client();
   if (!sb || !uid()) return false;
-  const { data } = await sb.from("profiles").select("session_token").eq("id", uid()).single();
-  if (!data) return false;
-  if (data.session_token && data.session_token !== Store.get(SESSION_KEY)) { kicked(); return false; }
+  const { data, error } = await sb.rpc("session_ok", { p_token: Store.get(SESSION_KEY) });
+  if (error) {
+    // patch-01 을 아직 안 돌린 DB 라면 함수가 없다. 확인만 못 할 뿐 로그인은 유효하므로
+    // 기록 등록이나 방 입장까지 막지는 않는다.
+    console.warn("[supabase] 세션 확인 실패 — patch-01-session-token.sql 적용 여부를 확인하세요", error);
+    return true;
+  }
+  if (!data) { kicked(); return false; }
   return true;
 }
 
