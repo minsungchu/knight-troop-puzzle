@@ -101,20 +101,37 @@ export async function claimSession() {
   // 동시접속 제한은 편의 기능이다 — 실패해도 로그인 자체를 막지 않는다
   const { error } = await sb.rpc("claim_session", { p_token: token });
   if (error) console.warn("[supabase] 자리 등록 실패", error);
-  await watchSession();
-  if (sessionChannel) {
+  // 소켓이 연결된 뒤에 보내야 한다. 구독 전에 보내면 REST 로 폴백되고,
+  // 그 경로는 realtime-js 가 없앨 예정이라고 경고한다.
+  const ready = await watchSession();
+  if (ready && sessionChannel) {
     sessionChannel.send({ type: "broadcast", event: "claim", payload: { token } });
   }
 }
 
-async function watchSession() {
-  const sb = await client();
-  if (!sb || !uid() || sessionChannel) return;
-  sessionChannel = sb.channel(`user:${uid()}`, { config: { broadcast: { self: false } } });
-  sessionChannel.on("broadcast", { event: "claim" }, ({ payload }) => {
-    if (payload && payload.token !== Store.get(SESSION_KEY)) kicked();
+/** 내 계정 채널을 구독한다. SUBSCRIBED 가 확인되면 true. */
+function watchSession() {
+  return client().then((sb) => {
+    if (!sb || !uid()) return false;
+    if (sessionChannel) return sessionChannel.__ready || false;
+
+    const ch = sb.channel(`user:${uid()}`, { config: { broadcast: { self: false } } });
+    sessionChannel = ch;
+    ch.on("broadcast", { event: "claim" }, ({ payload }) => {
+      if (payload && payload.token !== Store.get(SESSION_KEY)) kicked();
+    });
+
+    return new Promise((resolve) => {
+      let settled = false;
+      const done = (ok) => { if (!settled) { settled = true; ch.__ready = ok; resolve(ok); } };
+      // 구독이 끝내 안 되어도 로그인을 붙잡아 두지 않는다
+      setTimeout(() => done(false), 5000);
+      ch.subscribe((status) => {
+        if (status === "SUBSCRIBED") done(true);
+        else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") done(false);
+      });
+    });
   });
-  await sessionChannel.subscribe();
 }
 
 function unwatchSession() {
