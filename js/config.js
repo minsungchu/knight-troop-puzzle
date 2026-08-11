@@ -11,8 +11,8 @@
  *
  * 비워 두면 앱은 '혼자 플레이' 모드로만 동작합니다.
  */
-export const SUPABASE_URL = "";
-export const SUPABASE_ANON_KEY = "";
+export const SUPABASE_URL = "https://bguxryrmwpkcnsayluhm.supabase.co";
+export const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJndXhyeXJtd3BrY25zYXlsdWhtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NTEyNDAsImV4cCI6MjEwMjAyNzI0MH0.gbsydorybuPf7PFY-qmG0j1npb4hCtRma76tbOgbV9k";
 
 /** 온라인 기능 사용 가능 여부 */
 export const ONLINE = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
