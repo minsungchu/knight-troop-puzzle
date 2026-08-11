@@ -62,19 +62,21 @@ export function showTab(name) {
 
 export const currentTab = () => ($(".tab.on") || {}).dataset?.tab || "game";
 
-/* ── 저장소: localStorage → 메모리 ── */
-const mem = {};
-export const Store = {
-  get(k) {
-    try { return window.localStorage.getItem(k); } catch { return mem[k] ?? null; }
-  },
-  set(k, v) {
-    try { window.localStorage.setItem(k, v); } catch { mem[k] = v; }
-  },
-  del(k) {
-    try { window.localStorage.removeItem(k); } catch { delete mem[k]; }
-  },
-};
+/* ── 저장소 ──
+   Store    : localStorage — 기기 단위. 풀던 판·기록 같은 것.
+   TabStore : sessionStorage — 탭 단위. 새로고침에는 남고 새 탭에는 안 따라간다.
+              '한 계정 동시접속 1곳'의 '1곳'을 탭으로 세기 위해 쓴다. */
+function makeStore(pick) {
+  const mem = {};
+  return {
+    get(k) { try { return pick().getItem(k); } catch { return mem[k] ?? null; } },
+    set(k, v) { try { pick().setItem(k, v); } catch { mem[k] = v; } },
+    del(k) { try { pick().removeItem(k); } catch { delete mem[k]; } },
+  };
+}
+
+export const Store = makeStore(() => window.localStorage);
+export const TabStore = makeStore(() => window.sessionStorage);
 
 /* ── 시간 ── */
 /** 밀리초 → "분:초" */

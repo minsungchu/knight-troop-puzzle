@@ -4,7 +4,7 @@
  * 앱은 '혼자 플레이' 모드로만 동작한다. 온라인 코드는 전부 이 파일을 거친다.
  */
 import { SUPABASE_URL, SUPABASE_ANON_KEY, ONLINE, SESSION_KEY, EMAIL_DOMAIN } from "./config.js";
-import { Store } from "./ui.js";
+import { TabStore } from "./ui.js";
 
 export { ONLINE };
 
@@ -68,14 +68,19 @@ export async function refresh() {
   }
 
   fireAuth();
-  if (me.profile) watchSession();
+  if (me.profile) {
+    // 새 탭은 로그인 상태만 물려받고 자리 표는 없다 — 여기서 자리를 이어받아
+    // 먼저 열려 있던 탭을 물러나게 한다. 같은 탭 새로고침은 표가 남아 있어 그대로다.
+    if (!TabStore.get(SESSION_KEY)) claimSession();
+    else watchSession();
+  }
   return me;
 }
 
 export async function signOut(quiet) {
   const sb = await client();
   if (sb) await sb.auth.signOut();
-  Store.del(SESSION_KEY);
+  TabStore.del(SESSION_KEY);
   unwatchSession();
   me.user = null; me.profile = null;
   fireAuth();
@@ -98,7 +103,7 @@ export async function claimSession() {
   const sb = await client();
   if (!sb || !uid()) return;
   const token = crypto.randomUUID();
-  Store.set(SESSION_KEY, token);
+  TabStore.set(SESSION_KEY, token);
   // 동시접속 제한은 편의 기능이다 — 실패해도 로그인 자체를 막지 않는다
   const { error } = await sb.rpc("claim_session", { p_token: token });
   if (error) console.warn("[supabase] 자리 등록 실패", error);
@@ -122,7 +127,7 @@ function watchSession() {
     const ch = sb.channel(`user:${uid()}`, { config: { broadcast: { self: false } } });
     sessionChannel = ch;
     ch.on("broadcast", { event: "claim" }, ({ payload }) => {
-      if (payload && payload.token !== Store.get(SESSION_KEY)) kicked();
+      if (payload && payload.token !== TabStore.get(SESSION_KEY)) kicked();
     });
 
     return new Promise((resolve) => {
@@ -155,7 +160,7 @@ function kicked() {
 export async function sessionValid() {
   const sb = await client();
   if (!sb || !uid()) return false;
-  const { data, error } = await sb.rpc("session_ok", { p_token: Store.get(SESSION_KEY) });
+  const { data, error } = await sb.rpc("session_ok", { p_token: TabStore.get(SESSION_KEY) });
   if (error) {
     // patch-01 을 아직 안 돌린 DB 라면 함수가 없다. 확인만 못 할 뿐 로그인은 유효하므로
     // 기록 등록이나 방 입장까지 막지는 않는다.
