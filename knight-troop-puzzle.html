@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>나이트 부대 배치 — 전장 퍼즐</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --void:#080d16;
+  --deep:#0e1726;
+  --table:#17243a;
+  --plinth:#101b2c;
+  --stone-1:#23344b;
+  --stone-2:#2d4159;
+  --stone-edge:#0a1220;
+  --brass:#c9973f;
+  --brass-lo:#8a6524;
+  --parch:#ece2cb;
+  --mist:#93a7c0;
+  --u1:#f0b429; --u2:#43bf8f; --u3:#e0576d; --u4:#5a9fe0;
+  --cell:52px; --gap:5px; --depth:0px;
+  --display:"Gowun Batang","Nanum Myeongjo",Georgia,serif;
+  --latin:"Cinzel",Georgia,serif;
+  --body:"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",system-ui,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  min-height:100vh; background:
+    radial-gradient(1100px 700px at 50% -12%, #1c2c46 0%, transparent 62%),
+    radial-gradient(700px 500px at 88% 108%, #14263b 0%, transparent 60%),
+    var(--void);
+  color:var(--parch); font-family:var(--body); -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+body::before{
+  content:""; position:fixed; inset:0; pointer-events:none; opacity:.5;
+  background-image:radial-gradient(rgba(201,151,63,.14) 1px, transparent 1px);
+  background-size:34px 34px; mask-image:radial-gradient(circle at 50% 30%, #000 0%, transparent 78%);
+}
+.wrap{position:relative; max-width:1180px; margin:0 auto; padding:22px 16px 120px}
+
+/* ── 머리말 ── */
+.masthead{display:flex; flex-wrap:wrap; align-items:flex-end; gap:14px 22px; border-bottom:1px solid rgba(201,151,63,.28); padding-bottom:14px}
+.brand h1{
+  font-family:var(--display); font-weight:700; font-size:clamp(21px,3.4vw,30px);
+  margin:0; letter-spacing:.02em; color:var(--parch);
+}
+.brand .sub{font-size:12px; color:var(--mist); letter-spacing:.16em; margin-top:5px; font-family:var(--latin)}
+.setup{display:flex; flex-wrap:wrap; gap:10px; margin-left:auto; align-items:flex-end}
+.field{display:flex; flex-direction:column; gap:5px}
+.field label{font-size:10.5px; letter-spacing:.16em; color:var(--mist)}
+select,.btn{
+  font-family:var(--body); font-size:13px; color:var(--parch);
+  background:linear-gradient(#1d2c43,#15202f); border:1px solid rgba(201,151,63,.34);
+  padding:8px 11px; border-radius:5px; cursor:pointer; transition:.16s;
+}
+select{min-width:74px}
+.btn:hover,select:hover{border-color:var(--brass); background:linear-gradient(#26374f,#182437)}
+.btn.primary{background:linear-gradient(#c9973f,#9c7024); color:#1a1206; border-color:#e0b45c; font-weight:700}
+.btn.primary:hover{background:linear-gradient(#dda94f,#a87b28)}
+.btn[disabled]{opacity:.32; pointer-events:none}
+.btn:focus-visible,select:focus-visible,.tile:focus-visible{outline:2px solid var(--brass); outline-offset:2px}
+
+/* ── 상태 표시줄 ── */
+.status{display:flex; flex-wrap:wrap; gap:8px 26px; align-items:center; padding:12px 2px 0; font-size:12.5px; color:var(--mist)}
+.status>span{display:inline-flex; align-items:center; white-space:nowrap}
+/* 숫자는 고정폭 서체 + 최소 너비로 잡아 초가 바뀌어도 뒤 항목이 밀리지 않게 한다 */
+.status b{font-family:var(--mono); font-size:14px; color:var(--parch); font-weight:700; margin-left:8px;
+  font-variant-numeric:tabular-nums; display:inline-block; text-align:left; letter-spacing:.01em}
+#stLeft{min-width:3.2ch} #stFill{min-width:9.5ch} #stTime{min-width:5.2ch}
+.tag{border:1px solid rgba(201,151,63,.4); border-radius:99px; padding:3px 11px; font-size:11px; color:var(--brass); letter-spacing:.08em}
+
+/* ── 전장(3D) ── */
+.stage{perspective:1500px; perspective-origin:50% 42%; padding:30px 0 8px; display:flex; justify-content:center}
+.board{position:relative; transform:rotateX(var(--tilt,18deg)); transform-style:preserve-3d; transition:transform .25s ease-out}
+.plinth{
+  position:absolute; inset:-22px; border-radius:12px; transform:translateZ(-16px);
+  background:linear-gradient(160deg,#1b2b42,#0d1626 60%); border:1px solid rgba(201,151,63,.3);
+  box-shadow:0 40px 70px rgba(0,0,0,.62), inset 0 0 60px rgba(0,0,0,.5);
+}
+.plinth::after{content:""; position:absolute; inset:9px; border:1px solid rgba(201,151,63,.16); border-radius:6px}
+.grid{display:grid; gap:var(--gap); transform-style:preserve-3d; position:relative}
+
+.tile{position:relative; width:var(--cell); height:var(--cell); transform-style:preserve-3d; border:0; padding:0; background:none; cursor:pointer}
+.face{
+  position:absolute; inset:0; border-radius:6px; transform:translateZ(calc(var(--z,0px) + var(--zh,0px)));
+  transition:transform .18s cubic-bezier(.2,.8,.3,1), box-shadow .18s, background .18s;
+  background:linear-gradient(150deg,var(--stone-2),var(--stone-1));
+  box-shadow:0 1px 0 #1a2637,0 2px 0 #18232f,0 4px 0 #131d29,0 6px 0 #0e1621,0 10px 16px rgba(0,0,0,.55);
+  display:flex; align-items:center; justify-content:center; overflow:hidden;
+}
+.face::after{content:""; position:absolute; inset:0; border-radius:6px; border:1px solid rgba(255,255,255,.07); pointer-events:none}
+.tile:hover .face{--zh:8px}
+.tile.sel .face{box-shadow:0 1px 0 #1a2637,0 4px 0 #131d29,0 8px 0 #0e1621,0 14px 22px rgba(0,0,0,.6),0 0 0 2px var(--brass),0 0 26px rgba(201,151,63,.55); --z:10px}
+.tile.link .face{background:linear-gradient(150deg,#3a4a64,#2a3a52)}
+.tile.link .face::after{border-color:rgba(201,151,63,.55)}
+.tile.bad .face{box-shadow:0 4px 0 #2a0d14,0 8px 0 #1c0910,0 14px 22px rgba(0,0,0,.6),0 0 0 2px #e0576d,0 0 24px rgba(224,87,109,.5)}
+
+/* 배치된 부대 */
+.unit{display:none; flex-direction:column; align-items:center; justify-content:center; gap:1px; line-height:1}
+.tile.filled .unit{display:flex}
+.tile.filled .cands{display:none}
+.tile.filled .face{--z:22px}
+.tile.v1{--uc:var(--u1)} .tile.v2{--uc:var(--u2)} .tile.v3{--uc:var(--u3)} .tile.v4{--uc:var(--u4)}
+/* 처음부터 주어진 부대 — 판에 낮게 박힌 놋쇠 명판 */
+.tile.given .face{--z:8px; background:linear-gradient(150deg,#1d2937,#111a26);
+  box-shadow:0 1px 0 #16202c,0 2px 0 #111923,0 4px 0 #0c131c,0 7px 12px rgba(0,0,0,.5)}
+.tile.given .face::after{border:1.5px solid rgba(201,151,63,.75)}
+.tile.given .face::before{content:""; position:absolute; top:4px; left:4px; width:5px; height:5px;
+  border-radius:50%; background:var(--brass); box-shadow:0 0 6px rgba(201,151,63,.9); z-index:2}
+.tile.given .unit{opacity:.7; filter:saturate(.6)}
+/* 내가 확정한 부대 — 높이 솟아 부대색으로 빛나는 타일 */
+.tile.placed .face{--z:26px;
+  box-shadow:0 2px 0 #16202c,0 5px 0 #0f1721,0 9px 0 #0a1119,0 18px 28px rgba(0,0,0,.6),0 0 24px -4px var(--uc)}
+.tile.placed .face::after{border:1.5px solid var(--uc)}
+.tile.placed .unit{filter:drop-shadow(0 0 8px var(--uc))}
+.unit svg{width:calc(var(--cell) * .42); height:calc(var(--cell) * .42); fill:currentColor; filter:drop-shadow(0 1px 2px rgba(0,0,0,.6))}
+.unit .num{font-family:var(--latin); font-weight:700; font-size:calc(var(--cell) * .24); font-variant-numeric:tabular-nums}
+.tile.v1 .unit{color:var(--u1)} .tile.v2 .unit{color:var(--u2)}
+.tile.v3 .unit{color:var(--u3)} .tile.v4 .unit{color:var(--u4)}
+.tile.filled.v1 .face{background:linear-gradient(150deg,#4a3a16,#2c2410)}
+.tile.filled.v2 .face{background:linear-gradient(150deg,#16402f,#0f2a20)}
+.tile.filled.v3 .face{background:linear-gradient(150deg,#4a1d27,#2c1219)}
+.tile.filled.v4 .face{background:linear-gradient(150deg,#183350,#101f31)}
+.tile.given .face::after{border:1px solid rgba(201,151,63,.7)}
+.tile.given .unit{filter:none}
+
+/* 후보 표시 */
+.cands{display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; width:100%; height:100%}
+.c{
+  display:flex; align-items:center; justify-content:center; cursor:pointer;
+  font-family:var(--latin); font-weight:600; font-size:calc(var(--cell) * .26);
+  color:var(--mist); opacity:.9; transition:.14s; border-radius:3px;
+}
+.c:hover{background:rgba(255,255,255,.08)}
+.c.v1{color:var(--u1)} .c.v2{color:var(--u2)} .c.v3{color:var(--u3)} .c.v4{color:var(--u4)}
+.c.off{opacity:.13; text-decoration:line-through}
+.c.only{font-size:calc(var(--cell) * .34); text-shadow:0 0 12px currentColor}
+
+/* ── 부대 팔레트 ── */
+.deck{display:flex; flex-wrap:wrap; gap:10px; justify-content:center; margin-top:26px}
+.troop{
+  display:flex; align-items:center; gap:9px; padding:9px 14px 9px 11px; border-radius:7px; cursor:pointer;
+  background:linear-gradient(#1c2b40,#131e2d); border:1px solid rgba(201,151,63,.3); color:var(--parch);
+  font-family:var(--body); font-size:13px; transition:.16s;
+}
+.troop svg{width:22px; height:22px; fill:currentColor}
+.troop .k{font-family:var(--latin); font-weight:700; font-size:15px; opacity:.85}
+.troop .left{font-size:11px; color:var(--mist); font-family:var(--mono); font-variant-numeric:tabular-nums;
+  min-width:2.4ch; text-align:right; display:inline-block}
+.troop[data-v="1"]{color:var(--u1)} .troop[data-v="2"]{color:var(--u2)}
+.troop[data-v="3"]{color:var(--u3)} .troop[data-v="4"]{color:var(--u4)}
+.troop:hover{transform:translateY(-2px); border-color:currentColor; box-shadow:0 8px 20px rgba(0,0,0,.45)}
+.troop.on{border-color:currentColor; box-shadow:0 0 0 1px currentColor,0 0 22px -6px currentColor}
+.troop .nm{color:var(--parch)}
+
+/* ── 도구 ── */
+.tools{display:flex; flex-wrap:wrap; gap:9px; justify-content:center; align-items:center; margin-top:16px}
+.tools .btn{font-size:12.5px; padding:7px 12px}
+.switches{display:flex; flex-wrap:wrap; gap:8px 18px; justify-content:center; margin-top:16px; font-size:12px; color:var(--mist)}
+.switches label{display:flex; align-items:center; gap:7px; cursor:pointer}
+input[type=range]{accent-color:var(--brass); width:120px}
+
+/* ── 안내/설계 ── */
+details{margin-top:30px; border:1px solid rgba(201,151,63,.24); border-radius:8px; background:rgba(13,22,36,.6)}
+summary{cursor:pointer; padding:13px 16px; font-family:var(--display); font-size:14.5px; color:var(--brass); letter-spacing:.03em}
+.doc{padding:2px 20px 20px; font-size:13px; line-height:1.85; color:#c6d3e3}
+.doc h3{font-family:var(--display); color:var(--parch); font-size:14px; margin:18px 0 6px; letter-spacing:.03em}
+.doc code{background:rgba(201,151,63,.12); padding:1px 5px; border-radius:3px; font-size:12px; color:var(--brass)}
+.doc ul{margin:6px 0; padding-left:19px} .doc li{margin:3px 0}
+
+.note{
+  max-width:760px; margin:16px auto 0; padding:13px 17px; border-radius:8px; font-size:13px; line-height:1.75;
+  background:rgba(20,32,50,.72); border:1px solid rgba(201,151,63,.34); color:#d6e0ee;
+}
+.note b{color:var(--brass)} .note .k{font-family:var(--latin); font-weight:700}
+.note ul{margin:7px 0 0; padding-left:18px} .note li{margin:2px 0}
+.tile.pick .face{box-shadow:0 4px 0 #131d29,0 8px 0 #0e1621,0 16px 24px rgba(0,0,0,.6),0 0 0 2px var(--parch),0 0 30px rgba(236,226,203,.6); --z:16px}
+.tile.why .face{box-shadow:0 4px 0 #131d29,0 8px 0 #0e1621,0 14px 22px rgba(0,0,0,.6),0 0 0 2px var(--brass),0 0 22px rgba(201,151,63,.5)}
+.toast{
+  position:fixed; left:50%; bottom:26px; transform:translateX(-50%) translateY(14px);
+  background:linear-gradient(#1d2c43,#121d2c); border:1px solid rgba(201,151,63,.5); color:var(--parch);
+  padding:11px 18px; border-radius:7px; font-size:13px; opacity:0; pointer-events:none; transition:.3s; z-index:40;
+  box-shadow:0 14px 34px rgba(0,0,0,.55); max-width:90vw; text-align:center;
+}
+.toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+
+.veil{position:fixed; inset:0; background:rgba(5,9,16,.82); display:none; align-items:center; justify-content:center; z-index:50; backdrop-filter:blur(4px)}
+.veil.show{display:flex}
+.card{
+  background:linear-gradient(160deg,#1b2b42,#0d1626); border:1px solid rgba(201,151,63,.5); border-radius:12px;
+  padding:34px 38px; text-align:center; max-width:min(440px,90vw); box-shadow:0 30px 70px rgba(0,0,0,.7);
+}
+.card h2{font-family:var(--display); color:var(--brass); margin:0 0 6px; font-size:24px}
+.card p{color:var(--mist); font-size:13.5px; margin:6px 0 20px; line-height:1.8}
+.card .stats{display:flex; gap:22px; justify-content:center; margin:16px 0 22px}
+.card .stat{font-size:11px; color:var(--mist); letter-spacing:.1em}
+.card .stat b{display:block; font-family:var(--latin); font-size:23px; color:var(--parch); margin-top:5px; font-variant-numeric:tabular-nums}
+.spin{width:34px; height:34px; border:2px solid rgba(201,151,63,.25); border-top-color:var(--brass); border-radius:50%; animation:sp .8s linear infinite; margin:0 auto 14px}
+@keyframes sp{to{transform:rotate(360deg)}}
+@keyframes rise{0%{transform:translateZ(0)}50%{transform:translateZ(44px)}100%{transform:translateZ(22px)}}
+.tile.cheer .face{animation:rise .7s ease-out}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms !important; transition-duration:.01ms !important}}
+@media (max-width:620px){
+  .setup{margin-left:0; width:100%}
+  .stage{perspective:900px; padding:18px 0 4px}
+  .troop .nm{display:none}
+  .wrap{padding-bottom:90px}
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="u1" viewBox="0 0 24 24"><path d="M12 1.6l3.1 6.2h-2.1v13.4h-2V7.8H8.9L12 1.6z"/><path d="M9.2 9.6h5.6v1.5H9.2z"/></symbol>
+  <symbol id="u2" viewBox="0 0 24 24"><path d="M7 2.6c4.6 2 7.4 5.5 7.4 9.4S11.6 19.4 7 21.4l-.8-1.8c3.9-1.7 6.2-4.5 6.2-7.6S10.1 6.1 6.2 4.4L7 2.6z"/><path d="M5.4 11.2h13.2v1.7H5.4z"/><path d="M17.4 8.6l4 3.4-4 3.4z"/></symbol>
+  <symbol id="u3" viewBox="0 0 24 24"><path d="M8.4 21.6v-6.9c0-3.4 1.6-5.6 4.2-6.9l-1.4-3.2 2.9.7 1.9-2.2.8 4c2 1.8 2.6 4.4 2.1 6.6-.4 1.8-1.4 3.2-2.6 4v3.9H8.4z"/><circle cx="15.2" cy="8.6" r=".9" fill="#0e1726"/><path d="M4.6 21.6c0-2.6 1.2-4.6 3.2-5.9v5.9H4.6z"/></symbol>
+  <symbol id="u4" viewBox="0 0 24 24"><path d="M12 2.2l8 2.9v6.2c0 4.7-3.4 8.6-8 10.5-4.6-1.9-8-5.8-8-10.5V5.1l8-2.9z"/><path d="M12 5.2l5 1.8v4.3c0 3-2.1 5.6-5 7-2.9-1.4-5-4-5-7V7l5-1.8z" fill="#0e1726" opacity=".45"/></symbol>
+</defs></svg>
+
+<div class="wrap">
+  <header class="masthead">
+    <div class="brand">
+      <h1>나이트 부대 배치</h1>
+      <div class="sub">KNIGHT DEPLOYMENT · 4 TROOPS</div>
+    </div>
+    <div class="setup">
+      <div class="field"><label for="selW">가로</label><select id="selW"></select></div>
+      <div class="field"><label for="selH">세로</label><select id="selH"></select></div>
+      <div class="field"><label for="selL">난이도</label>
+        <select id="selL"><option value="1">쉬움</option><option value="2" selected>보통</option><option value="3">어려움</option></select>
+      </div>
+      <button class="btn primary" id="btnNew">새 전장 편성</button>
+    </div>
+  </header>
+
+  <div class="status">
+    <span>남은 칸<b id="stLeft">0</b></span>
+    <span>배치 완료<b id="stFill">0</b></span>
+    <span>경과<b id="stTime">0:00</b></span>
+    <span class="tag" id="stGrade">보통</span>
+    <span class="tag" id="stMode">소거 추론만</span>
+  </div>
+
+  <div class="stage">
+    <div class="board" id="board">
+      <div class="plinth"></div>
+      <div class="grid" id="grid" tabindex="0" role="grid" aria-label="전장 판"></div>
+        </div>
+  </div>
+
+  <div class="deck" id="deck"></div>
+
+  <div class="tools">
+    <button class="btn" id="btnNext">다음 한 수 찾기</button>
+    <button class="btn" id="btnRelease" disabled>선택한 칸 해제</button>
+  </div>
+
+  <div class="note" id="note" hidden></div>
+
+  <div class="switches">
+    <label>기울기 <input type="range" id="optTilt" min="0" max="42" value="18"></label>
+  </div>
+
+  <details>
+    <summary>규칙과 조작</summary>
+    <div class="doc">
+      <h3>규칙</h3>
+      <ul>
+        <li>모든 칸에 1~4번 부대 중 하나가 배치된다.</li>
+        <li>나이트 이동(직선 한 칸 + 이어서 대각선 한 칸)으로 닿는 두 칸에는 같은 부대를 둘 수 없다.</li>
+        <li>가로·세로·대각선 어느 방향으로도 같은 부대가 3칸 연속으로 늘어설 수 없다.</li>
+      </ul>
+      <h3>조작</h3>
+      <ul>
+        <li>처음에는 모든 빈 칸에 1·2·3·4가 그대로 적혀 있다. 작은 숫자를 누르면 그 후보가 지워지고, 다시 누르면 되살아난다.</li>
+        <li>후보가 하나만 남았을 때 그 숫자를 누르면 지워지는 대신 그 부대가 배치된다. 칸을 고르고 <code>1</code>~<code>4</code> 키나 아래 부대 버튼을 눌러도 된다.</li>
+        <li><b>어떤 부대든 놓을 수 있다.</b> 판단은 전적으로 당신 몫이고, 게임은 정답을 미리 알려 주지 않는다. 다만 세 규칙 중 하나를 실제로 어기는 배치는 그 칸이 붉게 표시된다.</li>
+        <li>한 번 확정한 칸은 눌러도 풀리지 않는다. 되돌리려면 그 칸을 고른 뒤 <b>선택한 칸 해제</b>를 누른다(<code>Backspace</code>도 같은 동작).</li>
+        <li><b>다음 한 수 찾기</b>는 지금 상태에서 소거만으로 확정되는 칸이 몇 개인지 세어 알려준다. 한 번 더 누르면 어떤 부대가 왜 지워지는지 근거 칸까지 짚어 준다.</li>
+        <li>처음부터 주어진 부대는 놋쇠 점이 찍힌 낮은 명판으로, 내가 확정한 부대는 부대색으로 빛나며 높이 솟은 타일로 표시된다.</li>
+        <li>칸을 고르면 나이트가 닿는 칸이 함께 밝아진다. 방향키로 칸을 옮길 수 있다.</li>
+      </ul>
+      <h3>진행 저장</h3>
+      <ul><li>배치와 후보 표시는 자동 저장되어, 다시 열면 그대로 이어서 풀 수 있다.</li></ul>
+    </div>
+  </details>
+
+  <details>
+    <summary>설계 요약 — 어떻게 항상 풀리는 문제를 만드는가</summary>
+    <div class="doc">
+      <h3>1. 정답지 생성</h3>
+      <ul>
+        <li>후보 비트마스크(1~4 → 4비트) 위에서 제약 전파 + MRV 백트래킹으로 무작위 정답지를 만든다.</li>
+        <li>탐색이 예산을 넘기면 <code>값(r,c) = perm[2·g(r) + h(c)]</code> 패턴으로 폴백한다. <code>g(r)≠g(r+2)</code>, <code>h(c)≠h(c+2)</code>이면 나이트 이동은 항상 두 비트 중 하나를 뒤집고, 같은 값 덩어리는 최대 2연속이므로 어떤 크기에서도 세 규칙을 모두 만족한다. 즉 정답지가 없는 판 크기는 존재하지 않는다.</li>
+      </ul>
+      <h3>2. 논리 솔버 (난이도의 정의)</h3>
+      <ul>
+        <li><b>1단계</b> 확정 칸으로부터의 소거 — 나이트 이웃에서 그 값 제거, 3연속 트리플에서 두 칸이 같은 값이면 나머지 칸에서 그 값 제거. 후보가 하나 남으면 확정.</li>
+        <li><b>2단계</b> 후보가 2개인 칸에 값을 가정해 전파했을 때 모순이 나면 그 후보를 제거.</li>
+        <li><b>3단계</b> 모든 칸으로 가정 범위를 넓히고, 두 갈래 모두에서 공통으로 나오는 결론을 채택.</li>
+      </ul>
+      <h3>3. 출제</h3>
+      <ul>
+        <li>정답지에서 칸을 무작위 순서로 지우되, <b>지운 뒤에도 해당 난이도의 논리 솔버가 끝까지 푸는 경우에만</b> 지운 상태를 유지한다. 논리만으로 완주된다는 것은 해가 유일하다는 뜻이므로, 유일해와 풀이 가능성이 동시에 보장된다.</li>
+        <li><b>쉬움과 보통은 1단계 소거 추론만으로 끝까지 풀리도록 출제한다.</b> 어느 시점에도 후보 3개가 직접 지워지는 칸이 반드시 존재하므로, 값을 가정해 보는 단계가 필요 없다. 두 난이도의 차이는 힌트 양이다 — 쉬움 50%, 보통 32%. 상단 태그에 <code>소거 추론만</code>으로 표시된다.</li>
+        <li>어려움만 2단계(한 칸에 값을 가정해 전파했을 때 모순이면 그 후보를 제거)를 허용하고 힌트 하한을 두지 않는다. 상단 태그에 <code>가정 추론 필요</code>로 표시된다.</li>
+      </ul>
+    </div>
+  </details>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="veil" id="veil"><div class="card" id="card"></div></div>
+
+<script>
+/* ===== 나이트 부대 배치 퍼즐 — 핵심 로직 =====
+   값 1..4 를 비트마스크로 표현: v -> 1<<(v-1), FULL = 15
+   규칙 R1: 각 칸은 1~4 중 하나
+   규칙 R2: 나이트 이동(±1,±2)/(±2,±1)으로 연결된 두 칸은 값이 다름
+   규칙 R3: 가로/세로/대각선/반대각선 방향 연속 3칸이 모두 같으면 안 됨
+*/
+const KP = (function () {
+  const FULL = 15;
+  const POP = new Uint8Array(16);
+  const SVAL = new Int8Array(16);
+  for (let m = 0; m < 16; m++) {
+    let p = 0, last = 0;
+    for (let v = 1; v <= 4; v++) if (m & (1 << (v - 1))) { p++; last = v; }
+    POP[m] = p;
+    SVAL[m] = p === 1 ? last : 0;
+  }
+  const bit = (v) => 1 << (v - 1);
+
+  // ---- 난수 (시드 고정 가능) ----
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function shuffle(arr, rnd) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = (rnd() * (i + 1)) | 0;
+      const t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+    }
+    return arr;
+  }
+
+  // ---- 판 구조(나이트 이웃 / 3연속 트리플) ----
+  const KDIR = [[1, 2], [2, 1], [-1, 2], [-2, 1], [1, -2], [2, -1], [-1, -2], [-2, -1]];
+  const TDIR = [[0, 1], [1, 0], [1, 1], [1, -1]];
+
+  function buildGeom(W, H) {
+    const N = W * H;
+    const knight = [], cellTriples = [], triples = [];
+    for (let i = 0; i < N; i++) { knight.push([]); cellTriples.push([]); }
+    for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
+      const i = r * W + c;
+      for (const [dr, dc] of KDIR) {
+        const nr = r + dr, nc = c + dc;
+        if (nr >= 0 && nr < H && nc >= 0 && nc < W) knight[i].push(nr * W + nc);
+      }
+      for (const [dr, dc] of TDIR) {
+        const r2 = r + 2 * dr, c2 = c + 2 * dc;
+        if (r2 < 0 || r2 >= H || c2 < 0 || c2 >= W) continue;
+        const t = [i, (r + dr) * W + (c + dc), r2 * W + c2];
+        const ti = triples.length;
+        triples.push(t);
+        for (const x of t) cellTriples[x].push(ti);
+      }
+    }
+    return { W, H, N, knight, triples, cellTriples };
+  }
+
+  // ---- 제약 전파 ----
+  function pruneTriple(cand, t, stack) {
+    for (let p = 0; p < 3; p++) {
+      const a = t[p], b = t[(p + 1) % 3], c = t[(p + 2) % 3];
+      const ma = cand[a];
+      if (POP[ma] === 1 && ma === cand[b] && (cand[c] & ma)) {
+        cand[c] &= ~ma;
+        if (!cand[c]) return false;
+        stack.push(c);
+      }
+    }
+    return true;
+  }
+
+  function propagate(g, cand, stack) {
+    while (stack.length) {
+      const i = stack.pop();
+      const m = cand[i];
+      if (m === 0) return false;
+      if (POP[m] === 1) {
+        const kn = g.knight[i];
+        for (let k = 0; k < kn.length; k++) {
+          const j = kn[k];
+          if (cand[j] & m) {
+            cand[j] &= ~m;
+            if (!cand[j]) return false;
+            stack.push(j);
+          }
+        }
+      }
+      const ct = g.cellTriples[i];
+      for (let k = 0; k < ct.length; k++) {
+        if (!pruneTriple(cand, g.triples[ct[k]], stack)) return false;
+      }
+    }
+    return true;
+  }
+
+  function allFixed(g, cand) {
+    for (let i = 0; i < g.N; i++) if (POP[cand[i]] !== 1) return false;
+    return true;
+  }
+
+  // ---- 완전 탐색(정답지 생성) ----
+  function dfs(g, cand, rnd, st) {
+    if (++st.nodes > st.limit) { st.abort = true; return null; }
+    let best = -1, bp = 9;
+    for (let k = 0; k < g.N; k++) {
+      const i = st.order[k], p = POP[cand[i]];
+      if (p > 1 && p < bp) { bp = p; best = i; if (p === 2) break; }
+    }
+    if (best < 0) return cand;
+    const vals = [];
+    for (let v = 1; v <= 4; v++) if (cand[best] & bit(v)) vals.push(v);
+    shuffle(vals, rnd);
+    for (const v of vals) {
+      const c2 = cand.slice();
+      c2[best] = bit(v);
+      if (propagate(g, c2, [best])) {
+        const r = dfs(g, c2, rnd, st);
+        if (r) return r;
+      }
+      if (st.abort) return null;
+    }
+    return null;
+  }
+
+  // ---- 폴백 정답지: 행 패턴 × 열 패턴 (항상 R1~R3 만족) ----
+  function patternSolution(g, rnd) {
+    const { W, H } = g;
+    const gr = new Uint8Array(H), hc = new Uint8Array(W);
+    const s0 = rnd() < 0.5 ? 0 : 1, s1 = rnd() < 0.5 ? 0 : 1;
+    const t0 = rnd() < 0.5 ? 0 : 1, t1 = rnd() < 0.5 ? 0 : 1;
+    for (let r = 0; r < H; r++) gr[r] = (((r % 2) ? s1 : s0) + ((r / 2) | 0)) % 2;
+    for (let c = 0; c < W; c++) hc[c] = (((c % 2) ? t1 : t0) + ((c / 2) | 0)) % 2;
+    const perm = shuffle([1, 2, 3, 4], rnd);
+    const sol = new Int8Array(g.N);
+    for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) sol[r * W + c] = perm[2 * gr[r] + hc[c]];
+    return sol;
+  }
+
+  function makeSolution(g, rnd, limit) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const cand = new Int8Array(g.N).fill(FULL);
+      const stack = [];
+      for (let i = 0; i < g.N; i++) stack.push(i);
+      if (!propagate(g, cand, stack)) break;
+      const order = shuffle(Array.from({ length: g.N }, (_, i) => i), rnd);
+      const st = { nodes: 0, limit: limit || 120000, abort: false, order };
+      const res = dfs(g, cand, rnd, st);
+      if (res) {
+        const sol = new Int8Array(g.N);
+        for (let i = 0; i < g.N; i++) sol[i] = SVAL[res[i]];
+        return { sol, byPattern: false };
+      }
+    }
+    return { sol: patternSolution(g, rnd), byPattern: true };
+  }
+
+  // ---- 논리 솔버 ----
+  // level 1: 확정칸 소거만 (단일 후보 확정)
+  // level 2: + 깊이1 가정 소거(후보 2개 칸 한정)
+  // level 3: + 깊이1 가정 소거(모든 칸) + 두 갈래 공통결론(교집합) 추론
+  function logicSolve(g, puzzle, level, deadline) {
+    const cand = new Int8Array(g.N).fill(FULL);
+    const stack = [];
+    for (let i = 0; i < g.N; i++) {
+      if (puzzle[i]) cand[i] = bit(puzzle[i]);
+      stack.push(i);
+    }
+    if (!propagate(g, cand, stack)) return null;
+
+    for (;;) {
+      if (allFixed(g, cand)) return cand;
+      if (level < 2) return null;
+      if (deadline && Date.now() > deadline) return null;
+
+      let progressed = false;
+
+      // 가정 소거
+      const onlyBi = (level === 2);
+      outer:
+      for (let i = 0; i < g.N; i++) {
+        const m = cand[i], p = POP[m];
+        if (p < 2) continue;
+        if (onlyBi && p !== 2) continue;
+        for (let v = 1; v <= 4; v++) {
+          const b = bit(v);
+          if (!(m & b)) continue;
+          const c2 = cand.slice();
+          c2[i] = b;
+          if (!propagate(g, c2, [i])) {
+            cand[i] &= ~b;
+            if (!cand[i]) return null;
+            if (!propagate(g, cand, [i])) return null;
+            progressed = true;
+            break outer;
+          }
+        }
+      }
+
+      // 공통결론 추론
+      if (!progressed && level >= 3) {
+        for (let i = 0; i < g.N && !progressed; i++) {
+          if (POP[cand[i]] !== 2) continue;
+          const vs = [];
+          for (let v = 1; v <= 4; v++) if (cand[i] & bit(v)) vs.push(v);
+          const a = cand.slice(); a[i] = bit(vs[0]);
+          const b = cand.slice(); b[i] = bit(vs[1]);
+          if (!propagate(g, a, [i]) || !propagate(g, b, [i])) { progressed = true; break; }
+          const changed = [];
+          for (let j = 0; j < g.N; j++) {
+            const nm = cand[j] & (a[j] | b[j]);
+            if (nm !== cand[j]) {
+              if (!nm) return null;
+              cand[j] = nm;
+              changed.push(j);
+            }
+          }
+          if (changed.length) {
+            if (!propagate(g, cand, changed)) return null;
+            progressed = true;
+          }
+        }
+      }
+
+      if (!progressed) return null;
+    }
+  }
+
+  // ---- 힌트 제거 ----
+  // minGiven: 남겨둘 최소 힌트 수(난이도 하한 조절용)
+  function makePuzzle(g, solution, level, rnd, deadline, minGiven) {
+    const puzzle = new Int8Array(solution);
+    let given = g.N;
+    const order = shuffle(Array.from({ length: g.N }, (_, i) => i), rnd);
+    for (const i of order) {
+      if (given <= (minGiven || 0)) break;
+      if (deadline && Date.now() > deadline) break;
+      const save = puzzle[i];
+      puzzle[i] = 0;
+      if (!logicSolve(g, puzzle, level, deadline)) puzzle[i] = save;
+      else given--;
+    }
+    return puzzle;
+  }
+
+  function gradePuzzle(g, puzzle, deadline) {
+    for (let l = 1; l <= 3; l++) if (logicSolve(g, puzzle, l, deadline)) return l;
+    return 4; // 논리로 못 푸는 경우(발생하면 안 됨)
+  }
+
+  // 난이도 = (허용 추론 기법, 힌트 하한)
+  // 쉬움/보통은 1단계(순수 소거)만 허용 — 가정해서 찍어야 하는 순간이 생기지 않는다.
+  // 어려움만 2단계(한 칸 가정 후 모순 확인)를 허용한다.
+  const TECH  = { 1: 1, 2: 1, 3: 2 };
+  const FLOOR = { 1: 0.50, 2: 0.32, 3: 0 };
+  const ATTEMPTS = { 1: 1, 2: 2, 3: 5 };
+
+  function generate(W, H, mode, opts) {
+    const level = TECH[mode] || 1;
+    opts = opts || {};
+    const rnd = mulberry32(opts.seed !== undefined ? opts.seed : (Math.random() * 1e9) | 0);
+    const g = buildGeom(W, H);
+    const t0 = Date.now();
+    const deadline = t0 + (opts.budgetMs || 6000);
+    const minGiven = Math.round(FLOOR[mode] * g.N);
+    let best = null;
+    for (let a = 0; a < (ATTEMPTS[mode] || 1); a++) {
+      const { sol, byPattern } = makeSolution(g, rnd, opts.nodeLimit);
+      const puzzle = makePuzzle(g, sol, level, rnd, deadline, minGiven);
+      let given = 0;
+      for (let i = 0; i < g.N; i++) if (puzzle[i]) given++;
+      const actualLevel = gradePuzzle(g, puzzle, Date.now() + 2000);
+      const cand = { W, H, geom: g, solution: sol, puzzle, byPattern, given, ratio: given / g.N, actualLevel, needsGuess: actualLevel > 1 };
+      if (!best) best = cand;
+      else {
+        const score = (x) => Math.min(x.actualLevel, level) * 10000 - x.given;
+        if (score(cand) > score(best)) best = cand;
+      }
+      if (best.actualLevel === level) break;
+      if (Date.now() > deadline) break;
+    }
+    best.ms = Date.now() - t0;
+    return best;
+  }
+
+  // ---- 검증 유틸 ----
+  function violations(g, values) {
+    // values: 0(빈칸) 또는 1..4
+    const bad = new Set();
+    for (let i = 0; i < g.N; i++) {
+      const v = values[i];
+      if (!v) continue;
+      for (const j of g.knight[i]) if (values[j] === v) { bad.add(i); bad.add(j); }
+    }
+    for (const t of g.triples) {
+      const [a, b, c] = t;
+      if (values[a] && values[a] === values[b] && values[b] === values[c]) { bad.add(a); bad.add(b); bad.add(c); }
+    }
+    return bad;
+  }
+
+  function checkSolution(g, values) {
+    for (let i = 0; i < g.N; i++) if (!values[i]) return false;
+    return violations(g, values).size === 0;
+  }
+
+  return { FULL, POP, SVAL, bit, buildGeom, propagate, logicSolve, makeSolution, makePuzzle, generate, gradePuzzle, violations, checkSolution, mulberry32, shuffle, patternSolution };
+})();
+
+
+
+</script>
+<script>
+(function(){
+"use strict";
+const $=(s)=>document.querySelector(s);
+const TROOPS=[null,{n:"창병",c:"u1"},{n:"궁병",c:"u2"},{n:"기병",c:"u3"},{n:"방패병",c:"u4"}];
+const LV={1:"쉬움",2:"보통",3:"어려움"};
+const KEY="knight-troop-puzzle:v1";
+const bit=(v)=>1<<(v-1);
+
+/* ── 저장소: 아티팩트 storage → localStorage → 메모리 ── */
+const Store=(function(){
+  const mem={};
+  const hasW=typeof window!=="undefined" && window.storage && typeof window.storage.get==="function";
+  return {
+    async get(k){
+      if(hasW){ try{ const r=await window.storage.get(k); return r?r.value:null; }catch(e){ return null; } }
+      try{ return window.localStorage.getItem(k); }catch(e){ return mem[k]||null; }
+    },
+    async set(k,v){
+      if(hasW){ try{ await window.storage.set(k,v); return; }catch(e){} }
+      try{ window.localStorage.setItem(k,v); }catch(e){ mem[k]=v; }
+    }
+  };
+})();
+
+/* ── 상태 ── */
+const S={W:8,H:8,level:2,geom:null,solution:null,given:null,values:null,cands:null,
+  sel:-1,pick:0,elapsed:0,tick:null,hi:{t:-1,w:[]},grade:2,done:false,tiles:[],busy:false};
+
+/* ── 초기화 ── */
+const selW=$("#selW"),selH=$("#selH"),selL=$("#selL");
+for(let n=5;n<=12;n++){
+  selW.insertAdjacentHTML("beforeend",`<option value="${n}"${n===8?" selected":""}>${n}</option>`);
+  selH.insertAdjacentHTML("beforeend",`<option value="${n}"${n===8?" selected":""}>${n}</option>`);
+}
+$("#deck").innerHTML=[1,2,3,4].map(v=>
+  `<button class="troop" data-v="${v}"><svg><use href="#u${v}"/></svg><span class="k">${v}</span><span class="nm">${TROOPS[v].n}</span><span class="left" data-left="${v}"></span></button>`
+).join("");
+
+/* ── 새 게임 ── */
+function newGame(W,H,level){
+  if(S.busy) return;
+  S.busy=true;
+  veil(`<div class="spin"></div><h2>전장 편성 중</h2><p>${W}×${H} · ${LV[level]}<br>풀 수 있는 배치만 남기고 정리하는 중입니다.</p>`);
+  setTimeout(()=>{
+    let r;
+    try{ r=KP.generate(W,H,level,{budgetMs:5000}); }
+    catch(e){ hideVeil(); S.busy=false; toast("판을 만들지 못했습니다. 크기를 줄이고 다시 시도해 주세요."); return; }
+    S.W=W; S.H=H; S.level=level; S.geom=r.geom; S.solution=r.solution;
+    S.given=new Uint8Array(r.geom.N); S.values=new Int8Array(r.geom.N); S.cands=new Int8Array(r.geom.N);
+    for(let i=0;i<r.geom.N;i++){
+      if(r.puzzle[i]){ S.given[i]=1; S.values[i]=r.puzzle[i]; S.cands[i]=0; }
+      else { S.cands[i]=15; }
+    }
+    S.grade=Math.min(r.actualLevel,3); S.sel=-1; S.pick=0;
+    S.elapsed=0; S.done=false; clearHi(); guide=-1; $("#note").hidden=true;
+    build(); startClock(); save();
+    hideVeil(); S.busy=false;
+  },40);
+}
+
+/* ── 판 그리기 ── */
+function build(){
+  const grid=$("#grid");
+  grid.style.gridTemplateColumns=`repeat(${S.W}, var(--cell))`;
+  let html="";
+  for(let i=0;i<S.geom.N;i++){
+    html+=`<div class="tile" data-i="${i}" tabindex="-1" role="gridcell">
+      <div class="face">
+        <div class="unit"><svg><use href="#u1"/></svg><span class="num"></span></div>
+        <div class="cands">${[1,2,3,4].map(v=>`<span class="c v${v}" data-v="${v}">${v}</span>`).join("")}</div>
+      </div></div>`;
+  }
+  grid.innerHTML=html;
+  S.tiles=Array.from(grid.children);
+  fit(); renderAll();
+}
+
+function fit(){
+  const narrow=window.innerWidth<620;
+  const pad=narrow?36:60;               // 받침대(plinth)와 그림자가 넘칠 여백
+  const avail=Math.min($(".stage").clientWidth,1140)-pad;
+  const gap=S.W>10?(narrow?3:4):5;
+  let cell=Math.floor((avail-gap*(S.W-1))/S.W);
+  cell=Math.max(24,Math.min(cell,72));
+  document.documentElement.style.setProperty("--cell",cell+"px");
+  document.documentElement.style.setProperty("--gap",gap+"px");
+}
+window.addEventListener("resize",()=>{ if(S.geom) fit(); });
+
+/* ── 렌더 ── */
+function renderCell(i,badSet){
+  const t=S.tiles[i], v=S.values[i];
+  t.className="tile"+(v?` filled v${v}`:"")+(S.given[i]?" given":(v?" placed":""))
+    +(S.sel===i?" sel":"")+(S.sel>=0&&S.geom.knight[S.sel].indexOf(i)>=0?" link":"")
+    +(badSet&&badSet.has(i)?" bad":"")+(S.hi.t===i?" pick":"")+(S.hi.w.indexOf(i)>=0?" why":"");
+  if(v){
+    t.querySelector("use").setAttribute("href","#u"+v);
+    t.querySelector(".num").textContent=v;
+    t.setAttribute("aria-label",`${TROOPS[v].n} 배치됨`);
+  }else{
+    const m=S.cands[i], only=KP.POP[m]===1;
+    t.querySelectorAll(".c").forEach(el=>{
+      const v2=+el.dataset.v;
+      el.className=`c v${v2}`+((m&bit(v2))?"":" off")+(only&&(m&bit(v2))?" only":"");
+    });
+    t.setAttribute("aria-label","빈 칸");
+  }
+}
+function renderAll(){
+  const bad=KP.violations(S.geom,S.values);   // 규칙을 실제로 어긴 칸만 표시(정답 여부는 알리지 않는다)
+  for(let i=0;i<S.geom.N;i++) renderCell(i,bad);
+  let filled=0; const cnt=[0,0,0,0,0];
+  for(let i=0;i<S.geom.N;i++) if(S.values[i]){ filled++; cnt[S.values[i]]++; }
+  $("#stLeft").textContent=S.geom.N-filled;
+  $("#stFill").textContent=filled+" / "+S.geom.N;
+  $("#stGrade").textContent=`${S.W}×${S.H} · ${LV[S.level]}`;
+  $("#stMode").textContent=S.grade>1?"가정 추론 필요":"소거 추론만";
+  $("#btnRelease").disabled=!(S.sel>=0&&S.values[S.sel]&&!S.given[S.sel]&&!S.done);
+  for(let v=1;v<=4;v++) document.querySelector(`[data-left="${v}"]`).textContent=cnt[v];
+  document.querySelectorAll(".troop").forEach(b=>b.classList.toggle("on",+b.dataset.v===S.pick));
+}
+
+/* ── 조작 ── */
+function place(i,v){
+  if(S.given[i]||S.done) return;
+  S.values[i]=v; S.cands[i]=0;
+  if(S.hi.t===i){ clearHi(); guide=-1; }
+  renderAll(); save(); checkWin();
+}
+function unplace(i){
+  if(S.given[i]||!S.values[i]||S.done) return;
+  S.values[i]=0; S.cands[i]=15;
+  renderAll(); save();
+}
+function toggleCand(i,v){
+  if(S.values[i]||S.done) return;
+  const b=bit(v);
+  if(S.cands[i]&b){
+    // 마지막 하나 남은 후보를 누르면 지우는 대신 그 부대를 확정한다
+    if(KP.POP[S.cands[i]]===1){ place(i,v); return; }
+    S.cands[i]&=~b;
+  }else{
+    S.cands[i]|=b;
+  }
+  renderAll(); save();
+}
+function select(i){ if(S.hi.t>=0&&S.hi.t!==i){ clearHi(); guide=-1; } S.sel=i; renderAll(); if(S.tiles[i]) S.tiles[i].focus({preventScroll:true}); }
+
+$("#grid").addEventListener("click",(e)=>{
+  const c=e.target.closest(".c"), t=e.target.closest(".tile");
+  if(!t) return;
+  const i=+t.dataset.i;
+  if(c && !S.values[i]){
+    if(S.pick){ place(i,S.pick); select(i); return; }
+    select(i); toggleCand(i,+c.dataset.v); return;
+  }
+  if(S.pick && !S.values[i]){ place(i,S.pick); select(i); return; }
+  select(i);
+});
+$("#grid").addEventListener("focus",()=>{ if(S.sel<0) select(0); });
+document.addEventListener("keydown",(e)=>{
+  if(e.target.tagName==="SELECT"||e.target.tagName==="INPUT") return;
+  if(S.sel<0){ if(e.key.indexOf("Arrow")===0){ e.preventDefault(); select(0); } return; }
+  const r=(S.sel/S.W)|0, c=S.sel%S.W;
+  if(e.key>="1"&&e.key<="4"){
+    if(S.sel>=0){ e.preventDefault(); place(S.sel,+e.key); }
+  }else if(e.key==="Backspace"||e.key==="Delete"||e.key==="0"){
+    e.preventDefault(); unplace(S.sel);
+  }else if(e.key.startsWith("Arrow")){
+    e.preventDefault();
+    let nr=r,nc=c;
+    if(e.key==="ArrowUp")nr=Math.max(0,r-1);
+    if(e.key==="ArrowDown")nr=Math.min(S.H-1,r+1);
+    if(e.key==="ArrowLeft")nc=Math.max(0,c-1);
+    if(e.key==="ArrowRight")nc=Math.min(S.W-1,c+1);
+    select(nr*S.W+nc);
+  }
+});
+document.querySelectorAll(".troop").forEach(b=>{
+  b.addEventListener("click",()=>{
+    const v=+b.dataset.v;
+    if(S.sel>=0&&!S.values[S.sel]&&!S.given[S.sel]){ place(S.sel,v); S.pick=0; }
+    else S.pick=(S.pick===v?0:v);
+    renderAll();
+  });
+});
+
+/* ── 지금 상태에서 '소거만으로' 확정되는 칸 찾기 ──
+   확정된 칸의 값만 근거로 삼는다. 후보 3개가 직접 지워지는 칸이 하나라도 있으면 찍을 필요가 없다는 뜻이다. */
+function findDirect(){
+  const out=[];
+  for(let i=0;i<S.geom.N;i++){
+    if(S.values[i]) continue;
+    const why={}, miss=[];
+    for(let v=1;v<=4;v++){
+      let f=null;
+      for(const j of S.geom.knight[i]) if(S.values[j]===v){ f={t:"k",c:[j]}; break; }
+      if(!f) for(const ti of S.geom.cellTriples[i]){
+        const o=S.geom.triples[ti].filter(x=>x!==i);
+        if(S.values[o[0]]===v&&S.values[o[1]]===v){ f={t:"t",c:o}; break; }
+      }
+      if(f) why[v]=f; else miss.push(v);
+    }
+    if(miss.length===1) out.push({i,v:miss[0],why});
+  }
+  return out;
+}
+const rc=(i)=>`${((i/S.W)|0)+1}행 ${(i%S.W)+1}열`;
+function note(html){ const n=$("#note"); n.innerHTML=html; n.hidden=false; }
+function clearHi(){ S.hi={t:-1,w:[]}; }
+let guide=-1;
+
+$("#btnNext").onclick=()=>{
+  let wrong=0;
+  for(let i=0;i<S.geom.N;i++) if(S.values[i]&&S.values[i]!==S.solution[i]) wrong++;
+  const warn=wrong?`<br><b>주의</b> — 지금 확정한 칸 중 ${wrong}개가 정답과 다릅니다. 그 칸을 해제해야 이 안내가 맞아떨어집니다.`:"";
+  const list=findDirect();
+  if(!list.length){
+    clearHi(); guide=-1; renderAll();
+    note((S.grade>1
+      ? "지금 상태에서는 소거만으로 확정되는 칸이 없습니다. <b>어려움</b>은 한 칸에 값을 가정해 모순을 확인하는 단계까지 필요합니다."
+      : "지금 상태에서는 소거만으로 확정되는 칸이 없습니다.")+warn);
+    return;
+  }
+  const cur=list.find(x=>x.i===guide);
+  if(cur){ // 두 번째 누름 — 근거 공개
+    const cells=[];
+    const li=[1,2,3,4].filter(v=>v!==cur.v).map(v=>{
+      const w=cur.why[v]; w.c.forEach(c=>cells.push(c));
+      return w.t==="k"
+        ? `<li><span class="k">${v}</span> ${TROOPS[v].n} — ${rc(w.c[0])}의 부대가 나이트 이동으로 닿습니다.</li>`
+        : `<li><span class="k">${v}</span> ${TROOPS[v].n} — ${rc(w.c[0])}·${rc(w.c[1])}에 이미 2연속이라 3연속 규칙에 걸립니다.</li>`;
+    }).join("");
+    S.hi={t:cur.i,w:cells}; renderAll();
+    note(`<b>${rc(cur.i)}</b>에서 세 부대가 이렇게 지워집니다.<ul>${li}</ul>남는 것은 <span class="k">${cur.v}</span> ${TROOPS[cur.v].n} 하나입니다.`);
+    return;
+  }
+  const pick=list[(Math.random()*list.length)|0];
+  guide=pick.i; S.hi={t:pick.i,w:[]}; S.sel=pick.i; renderAll();
+  note(`지금 <b>${list.length}개</b> 칸이 소거 추론만으로 확정됩니다 — 가정 없이 진행할 수 있습니다. 그중 하나는 <b>${rc(pick.i)}</b>. 근거를 보려면 <b>다음 한 수 찾기</b>를 한 번 더 누르세요.`+warn);
+};
+
+/* ── 도구 ── */
+$("#btnRelease").onclick=()=>{
+  const i=S.sel;
+  if(i<0||!S.values[i]||S.given[i]||S.done) return;
+  unplace(i); toast("배치를 해제했습니다. 후보 1·2·3·4가 다시 표시됩니다.");
+};
+$("#btnNew").onclick=()=>newGame(+selW.value,+selH.value,+selL.value);
+$("#optTilt").oninput=(e)=>{ $("#board").style.setProperty("--tilt",e.target.value+"deg"); };
+
+/* ── 승리 ── */
+function checkWin(){
+  for(let i=0;i<S.geom.N;i++) if(S.values[i]!==S.solution[i]) return;
+  S.done=true; stopClock(); save();
+  S.tiles.forEach((t,k)=>setTimeout(()=>{
+    t.classList.add("cheer"); setTimeout(()=>t.classList.remove("cheer"),700);
+  },(((k/S.W)|0)+(k%S.W))*36));
+  setTimeout(()=>{
+    veil(`<h2>배치 완료</h2><p>${S.W}×${S.H} · ${LV[S.level]} 전장을 모두 채웠습니다.</p>
+      <div class="stats">
+        <div class="stat">소요 시간<b>${fmt(S.elapsed)}</b></div>
+        <div class="stat">배치한 칸<b>${S.geom.N-count(S.given)}</b></div>
+      </div>
+      <button class="btn primary" id="againBtn">같은 조건으로 한 판 더</button>
+      <button class="btn" id="closeBtn">판 둘러보기</button>`);
+    $("#againBtn").onclick=()=>{ hideVeil(); newGame(S.W,S.H,S.level); };
+    $("#closeBtn").onclick=hideVeil;
+  },700+(S.W+S.H)*36);
+}
+const count=(a)=>{let n=0;for(let i=0;i<a.length;i++)if(a[i])n++;return n;};
+
+/* ── 시계 ── */
+function fmt(s){const m=(s/60)|0;return m+":"+String(s%60).padStart(2,"0");}
+function startClock(){ stopClock(); S.tick=setInterval(()=>{ if(!S.done){S.elapsed++; $("#stTime").textContent=fmt(S.elapsed); if(S.elapsed%10===0)save();} },1000); $("#stTime").textContent=fmt(S.elapsed); }
+function stopClock(){ if(S.tick) clearInterval(S.tick); S.tick=null; }
+
+/* ── 알림 / 오버레이 ── */
+let toastT=null;
+function toast(msg){ const el=$("#toast"); el.textContent=msg; el.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(()=>el.classList.remove("show"),2600); }
+function veil(html){ $("#card").innerHTML=html; $("#veil").classList.add("show"); }
+function hideVeil(){ $("#veil").classList.remove("show"); }
+
+/* ── 저장 / 복원 ── */
+let saveT=null;
+function save(){
+  clearTimeout(saveT);
+  saveT=setTimeout(()=>{
+    if(!S.geom) return;
+    const enc=(a,base)=>Array.from(a).map(x=>x.toString(base)).join("");
+    Store.set(KEY,JSON.stringify({
+      W:S.W,H:S.H,level:S.level,grade:S.grade,
+      sol:enc(S.solution,10),given:enc(S.given,10),val:enc(S.values,10),cand:enc(S.cands,16),
+      t:S.elapsed,done:S.done
+    }));
+  },400);
+}
+async function restoreSaved(){
+  let raw=null;
+  try{ raw=await Store.get(KEY); }catch(e){}
+  if(!raw) return false;
+  try{
+    const d=JSON.parse(raw);
+    if(!d||!d.W) return false;
+    const g=KP.buildGeom(d.W,d.H);
+    if(d.sol.length!==g.N) return false;
+    S.W=d.W; S.H=d.H; S.level=d.level; S.grade=d.grade||d.level; S.geom=g;
+    S.solution=Int8Array.from(d.sol,ch=>+ch);
+    S.given=Uint8Array.from(d.given,ch=>+ch);
+    S.values=Int8Array.from(d.val,ch=>+ch);
+    S.cands=Int8Array.from(d.cand,ch=>parseInt(ch,16));
+    S.elapsed=d.t||0; S.done=!!d.done;
+    selW.value=d.W; selH.value=d.H; selL.value=d.level;
+    build(); startClock();
+    toast("이전에 풀던 판을 이어서 진행합니다.");
+    return true;
+  }catch(e){ return false; }
+}
+
+(async function boot(){
+  const ok=await restoreSaved();
+  if(!ok) newGame(8,8,2);
+})();
+})();
+</script>
+</body>
+</html>

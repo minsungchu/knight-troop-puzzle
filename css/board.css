@@ -1,0 +1,113 @@
+/* 전장 판(3D) · 부대 팔레트 · 도구 · 안내문 */
+/* ── 전장(3D) ── */
+.stage{perspective:1500px; perspective-origin:50% 42%; padding:30px 0 8px; display:flex; justify-content:center}
+.board{position:relative; transform:rotateX(var(--tilt,18deg)); transform-style:preserve-3d; transition:transform .25s ease-out}
+.plinth{
+  position:absolute; inset:-22px; border-radius:12px; transform:translateZ(-16px);
+  background:linear-gradient(160deg,#1b2b42,#0d1626 60%); border:1px solid rgba(201,151,63,.3);
+  box-shadow:0 40px 70px rgba(0,0,0,.62), inset 0 0 60px rgba(0,0,0,.5);
+}
+.plinth::after{content:""; position:absolute; inset:9px; border:1px solid rgba(201,151,63,.16); border-radius:6px}
+.grid{display:grid; gap:var(--gap); transform-style:preserve-3d; position:relative}
+
+.tile{position:relative; width:var(--cell); height:var(--cell); transform-style:preserve-3d; border:0; padding:0; background:none; cursor:pointer}
+.face{
+  position:absolute; inset:0; border-radius:6px; transform:translateZ(calc(var(--z,0px) + var(--zh,0px)));
+  transition:transform .18s cubic-bezier(.2,.8,.3,1), box-shadow .18s, background .18s;
+  background:linear-gradient(150deg,var(--stone-2),var(--stone-1));
+  box-shadow:0 1px 0 #1a2637,0 2px 0 #18232f,0 4px 0 #131d29,0 6px 0 #0e1621,0 10px 16px rgba(0,0,0,.55);
+  display:flex; align-items:center; justify-content:center; overflow:hidden;
+}
+.face::after{content:""; position:absolute; inset:0; border-radius:6px; border:1px solid rgba(255,255,255,.07); pointer-events:none}
+.tile:hover .face{--zh:8px}
+.tile.sel .face{box-shadow:0 1px 0 #1a2637,0 4px 0 #131d29,0 8px 0 #0e1621,0 14px 22px rgba(0,0,0,.6),0 0 0 2px var(--brass),0 0 26px rgba(201,151,63,.55); --z:10px}
+.tile.link .face{background:linear-gradient(150deg,#3a4a64,#2a3a52)}
+.tile.link .face::after{border-color:rgba(201,151,63,.55)}
+.tile.bad .face{box-shadow:0 4px 0 #2a0d14,0 8px 0 #1c0910,0 14px 22px rgba(0,0,0,.6),0 0 0 2px #e0576d,0 0 24px rgba(224,87,109,.5)}
+
+/* 배치된 부대 */
+.unit{display:none; flex-direction:column; align-items:center; justify-content:center; gap:1px; line-height:1}
+.tile.filled .unit{display:flex}
+.tile.filled .cands{display:none}
+.tile.filled .face{--z:22px}
+.tile.v1{--uc:var(--u1)} .tile.v2{--uc:var(--u2)} .tile.v3{--uc:var(--u3)} .tile.v4{--uc:var(--u4)}
+/* 처음부터 주어진 부대 — 판에 낮게 박힌 놋쇠 명판 */
+.tile.given .face{--z:8px; background:linear-gradient(150deg,#1d2937,#111a26);
+  box-shadow:0 1px 0 #16202c,0 2px 0 #111923,0 4px 0 #0c131c,0 7px 12px rgba(0,0,0,.5)}
+.tile.given .face::after{border:1.5px solid rgba(201,151,63,.75)}
+.tile.given .face::before{content:""; position:absolute; top:4px; left:4px; width:5px; height:5px;
+  border-radius:50%; background:var(--brass); box-shadow:0 0 6px rgba(201,151,63,.9); z-index:2}
+.tile.given .unit{opacity:.7; filter:saturate(.6)}
+/* 내가 확정한 부대 — 높이 솟아 부대색으로 빛나는 타일 */
+.tile.placed .face{--z:26px;
+  box-shadow:0 2px 0 #16202c,0 5px 0 #0f1721,0 9px 0 #0a1119,0 18px 28px rgba(0,0,0,.6),0 0 24px -4px var(--uc)}
+.tile.placed .face::after{border:1.5px solid var(--uc)}
+.tile.placed .unit{filter:drop-shadow(0 0 8px var(--uc))}
+.unit svg{width:calc(var(--cell) * .42); height:calc(var(--cell) * .42); fill:currentColor; filter:drop-shadow(0 1px 2px rgba(0,0,0,.6))}
+.unit .num{font-family:var(--latin); font-weight:700; font-size:calc(var(--cell) * .24); font-variant-numeric:tabular-nums}
+.tile.v1 .unit{color:var(--u1)} .tile.v2 .unit{color:var(--u2)}
+.tile.v3 .unit{color:var(--u3)} .tile.v4 .unit{color:var(--u4)}
+.tile.filled.v1 .face{background:linear-gradient(150deg,#4a3a16,#2c2410)}
+.tile.filled.v2 .face{background:linear-gradient(150deg,#16402f,#0f2a20)}
+.tile.filled.v3 .face{background:linear-gradient(150deg,#4a1d27,#2c1219)}
+.tile.filled.v4 .face{background:linear-gradient(150deg,#183350,#101f31)}
+.tile.given .face::after{border:1px solid rgba(201,151,63,.7)}
+.tile.given .unit{filter:none}
+
+/* 후보 표시 */
+.cands{display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; width:100%; height:100%}
+.c{
+  display:flex; align-items:center; justify-content:center; cursor:pointer;
+  font-family:var(--latin); font-weight:600; font-size:calc(var(--cell) * .26);
+  color:var(--mist); opacity:.9; transition:.14s; border-radius:3px;
+}
+.c:hover{background:rgba(255,255,255,.08)}
+.c.v1{color:var(--u1)} .c.v2{color:var(--u2)} .c.v3{color:var(--u3)} .c.v4{color:var(--u4)}
+.c.off{opacity:.13; text-decoration:line-through}
+.c.only{font-size:calc(var(--cell) * .34); text-shadow:0 0 12px currentColor}
+
+/* ── 부대 팔레트 ── */
+.deck{display:flex; flex-wrap:wrap; gap:10px; justify-content:center; margin-top:26px}
+.troop{
+  display:flex; align-items:center; gap:9px; padding:9px 14px 9px 11px; border-radius:7px; cursor:pointer;
+  background:linear-gradient(#1c2b40,#131e2d); border:1px solid rgba(201,151,63,.3); color:var(--parch);
+  font-family:var(--body); font-size:13px; transition:.16s;
+}
+.troop svg{width:22px; height:22px; fill:currentColor}
+.troop .k{font-family:var(--latin); font-weight:700; font-size:15px; opacity:.85}
+.troop .left{font-size:11px; color:var(--mist); font-family:var(--mono); font-variant-numeric:tabular-nums;
+  min-width:2.4ch; text-align:right; display:inline-block}
+.troop[data-v="1"]{color:var(--u1)} .troop[data-v="2"]{color:var(--u2)}
+.troop[data-v="3"]{color:var(--u3)} .troop[data-v="4"]{color:var(--u4)}
+.troop:hover{transform:translateY(-2px); border-color:currentColor; box-shadow:0 8px 20px rgba(0,0,0,.45)}
+.troop.on{border-color:currentColor; box-shadow:0 0 0 1px currentColor,0 0 22px -6px currentColor}
+.troop .nm{color:var(--parch)}
+
+/* ── 도구 ── */
+.tools{display:flex; flex-wrap:wrap; gap:9px; justify-content:center; align-items:center; margin-top:16px}
+.tools .btn{font-size:12.5px; padding:7px 12px}
+.switches{display:flex; flex-wrap:wrap; gap:8px 18px; justify-content:center; margin-top:16px; font-size:12px; color:var(--mist)}
+.switches label{display:flex; align-items:center; gap:7px; cursor:pointer}
+input[type=range]{accent-color:var(--brass); width:120px}
+
+/* ── 안내/설계 ── */
+details{margin-top:30px; border:1px solid rgba(201,151,63,.24); border-radius:8px; background:rgba(13,22,36,.6)}
+summary{cursor:pointer; padding:13px 16px; font-family:var(--display); font-size:14.5px; color:var(--brass); letter-spacing:.03em}
+.doc{padding:2px 20px 20px; font-size:13px; line-height:1.85; color:#c6d3e3}
+.doc h3{font-family:var(--display); color:var(--parch); font-size:14px; margin:18px 0 6px; letter-spacing:.03em}
+.doc code{background:rgba(201,151,63,.12); padding:1px 5px; border-radius:3px; font-size:12px; color:var(--brass)}
+.doc ul{margin:6px 0; padding-left:19px} .doc li{margin:3px 0}
+
+.note{
+  max-width:760px; margin:16px auto 0; padding:13px 17px; border-radius:8px; font-size:13px; line-height:1.75;
+  background:rgba(20,32,50,.72); border:1px solid rgba(201,151,63,.34); color:#d6e0ee;
+}
+.note b{color:var(--brass)} .note .k{font-family:var(--latin); font-weight:700}
+.note ul{margin:7px 0 0; padding-left:18px} .note li{margin:2px 0}
+.tile.pick .face{box-shadow:0 4px 0 #131d29,0 8px 0 #0e1621,0 16px 24px rgba(0,0,0,.6),0 0 0 2px var(--parch),0 0 30px rgba(236,226,203,.6); --z:16px}
+.tile.why .face{box-shadow:0 4px 0 #131d29,0 8px 0 #0e1621,0 14px 22px rgba(0,0,0,.6),0 0 0 2px var(--brass),0 0 22px rgba(201,151,63,.5)}
+
+@media (max-width:620px){
+  .stage{perspective:900px; padding:18px 0 4px}
+  .troop .nm{display:none}
+}

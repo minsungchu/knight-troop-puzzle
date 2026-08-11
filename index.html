@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>나이트 부대 배치 — 전장 퍼즐</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/theme.css">
+<link rel="stylesheet" href="css/board.css">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="u1" viewBox="0 0 24 24"><path d="M12 1.6l3.1 6.2h-2.1v13.4h-2V7.8H8.9L12 1.6z"/><path d="M9.2 9.6h5.6v1.5H9.2z"/></symbol>
+  <symbol id="u2" viewBox="0 0 24 24"><path d="M7 2.6c4.6 2 7.4 5.5 7.4 9.4S11.6 19.4 7 21.4l-.8-1.8c3.9-1.7 6.2-4.5 6.2-7.6S10.1 6.1 6.2 4.4L7 2.6z"/><path d="M5.4 11.2h13.2v1.7H5.4z"/><path d="M17.4 8.6l4 3.4-4 3.4z"/></symbol>
+  <symbol id="u3" viewBox="0 0 24 24"><path d="M8.4 21.6v-6.9c0-3.4 1.6-5.6 4.2-6.9l-1.4-3.2 2.9.7 1.9-2.2.8 4c2 1.8 2.6 4.4 2.1 6.6-.4 1.8-1.4 3.2-2.6 4v3.9H8.4z"/><circle cx="15.2" cy="8.6" r=".9" fill="#0e1726"/><path d="M4.6 21.6c0-2.6 1.2-4.6 3.2-5.9v5.9H4.6z"/></symbol>
+  <symbol id="u4" viewBox="0 0 24 24"><path d="M12 2.2l8 2.9v6.2c0 4.7-3.4 8.6-8 10.5-4.6-1.9-8-5.8-8-10.5V5.1l8-2.9z"/><path d="M12 5.2l5 1.8v4.3c0 3-2.1 5.6-5 7-2.9-1.4-5-4-5-7V7l5-1.8z" fill="#0e1726" opacity=".45"/></symbol>
+</defs></svg>
+
+<div class="wrap">
+  <header class="masthead">
+    <div class="brand">
+      <h1>나이트 부대 배치</h1>
+      <div class="sub">KNIGHT DEPLOYMENT · 4 TROOPS</div>
+    </div>
+
+    <nav class="tabs" role="tablist" aria-label="화면 전환">
+      <button class="tab on" data-tab="game" role="tab" aria-selected="true">전장</button>
+      <button class="tab" data-tab="rank" role="tab" aria-selected="false">랭킹</button>
+      <button class="tab" data-tab="room" role="tab" aria-selected="false">대전</button>
+    </nav>
+
+    <div class="account" id="account"></div>
+  </header>
+
+  <!-- ══════════════ 전장 ══════════════ -->
+  <section class="view" data-view="game">
+    <div class="setup">
+      <div class="field"><label for="selW">가로</label><select id="selW"></select></div>
+      <div class="field"><label for="selH">세로</label><select id="selH"></select></div>
+      <div class="field"><label for="selL">난이도</label>
+        <select id="selL"><option value="1">쉬움</option><option value="2" selected>보통</option><option value="3">어려움</option></select>
+      </div>
+      <button class="btn primary" id="btnNew">새 전장 편성</button>
+    </div>
+
+    <!-- 대전 진행 중에만 나타나는 전황 띠 -->
+    <div class="matchbar" id="matchBar" hidden></div>
+
+    <div class="status">
+      <span>남은 칸<b id="stLeft">0</b></span>
+      <span>배치 완료<b id="stFill">0</b></span>
+      <span>경과<b id="stTime">0:00</b></span>
+      <span class="tag" id="stGrade">보통</span>
+      <span class="tag" id="stMode">소거 추론만</span>
+    </div>
+
+    <div class="stage">
+      <div class="board" id="board">
+        <div class="plinth"></div>
+        <div class="grid" id="grid" tabindex="0" role="grid" aria-label="전장 판"></div>
+      </div>
+    </div>
+
+    <div class="deck" id="deck"></div>
+
+    <div class="tools">
+      <button class="btn" id="btnNext">다음 한 수 찾기</button>
+      <button class="btn" id="btnRelease" disabled>선택한 칸 해제</button>
+    </div>
+
+    <div class="note" id="note" hidden></div>
+
+    <div class="switches">
+      <label>기울기 <input type="range" id="optTilt" min="0" max="42" value="18"></label>
+    </div>
+
+    <details>
+      <summary>규칙과 조작</summary>
+      <div class="doc">
+        <h3>규칙</h3>
+        <ul>
+          <li>모든 칸에 1~4번 부대 중 하나가 배치된다.</li>
+          <li>나이트 이동(직선 한 칸 + 이어서 대각선 한 칸)으로 닿는 두 칸에는 같은 부대를 둘 수 없다.</li>
+          <li>가로·세로·대각선 어느 방향으로도 같은 부대가 3칸 연속으로 늘어설 수 없다.</li>
+        </ul>
+        <h3>조작</h3>
+        <ul>
+          <li>처음에는 모든 빈 칸에 1·2·3·4가 그대로 적혀 있다. 작은 숫자를 누르면 그 후보가 지워지고, 다시 누르면 되살아난다.</li>
+          <li>후보가 하나만 남았을 때 그 숫자를 누르면 지워지는 대신 그 부대가 배치된다. 칸을 고르고 <code>1</code>~<code>4</code> 키나 아래 부대 버튼을 눌러도 된다.</li>
+          <li><b>어떤 부대든 놓을 수 있다.</b> 판단은 전적으로 당신 몫이고, 게임은 정답을 미리 알려 주지 않는다. 다만 세 규칙 중 하나를 실제로 어기는 배치는 그 칸이 붉게 표시된다.</li>
+          <li>한 번 확정한 칸은 눌러도 풀리지 않는다. 되돌리려면 그 칸을 고른 뒤 <b>선택한 칸 해제</b>를 누른다(<code>Backspace</code>도 같은 동작).</li>
+          <li><b>다음 한 수 찾기</b>는 지금 상태에서 소거만으로 확정되는 칸이 몇 개인지 세어 알려준다. 한 번 더 누르면 어떤 부대가 왜 지워지는지 근거 칸까지 짚어 준다.</li>
+          <li>처음부터 주어진 부대는 놋쇠 점이 찍힌 낮은 명판으로, 내가 확정한 부대는 부대색으로 빛나며 높이 솟은 타일로 표시된다.</li>
+          <li>칸을 고르면 나이트가 닿는 칸이 함께 밝아진다. 방향키로 칸을 옮길 수 있다.</li>
+        </ul>
+        <h3>힌트</h3>
+        <ul>
+          <li><b>다음 한 수 찾기는 한 판에 다섯 번</b>까지 쓸 수 있다. 새 칸을 짚어 줄 때만 한 번으로 센다 — 같은 칸의 근거를 다시 펴 보거나, 짚을 칸이 없다는 답을 받는 것은 세지 않는다.</li>
+          <li>힌트를 한 번이라도 쓴 판은 <b>랭킹에 오르지 않는다.</b> 기록은 내 기록 목록에만 남는다.</li>
+        </ul>
+        <h3>진행 저장</h3>
+        <ul><li>배치·후보 표시·경과 시간·남은 힌트가 자동 저장되어, 다시 열면 그대로 이어서 풀 수 있다.</li></ul>
+      </div>
+    </details>
+
+    <details>
+      <summary>설계 요약 — 어떻게 항상 풀리는 문제를 만드는가</summary>
+      <div class="doc">
+        <h3>1. 정답지 생성</h3>
+        <ul>
+          <li>후보 비트마스크(1~4 → 4비트) 위에서 제약 전파 + MRV 백트래킹으로 무작위 정답지를 만든다.</li>
+          <li>탐색이 예산을 넘기면 <code>값(r,c) = perm[2·g(r) + h(c)]</code> 패턴으로 폴백한다. <code>g(r)≠g(r+2)</code>, <code>h(c)≠h(c+2)</code>이면 나이트 이동은 항상 두 비트 중 하나를 뒤집고, 같은 값 덩어리는 최대 2연속이므로 어떤 크기에서도 세 규칙을 모두 만족한다. 즉 정답지가 없는 판 크기는 존재하지 않는다.</li>
+        </ul>
+        <h3>2. 논리 솔버 (난이도의 정의)</h3>
+        <ul>
+          <li><b>1단계</b> 확정 칸으로부터의 소거 — 나이트 이웃에서 그 값 제거, 3연속 트리플에서 두 칸이 같은 값이면 나머지 칸에서 그 값 제거. 후보가 하나 남으면 확정.</li>
+          <li><b>2단계</b> 후보가 2개인 칸에 값을 가정해 전파했을 때 모순이 나면 그 후보를 제거.</li>
+          <li><b>3단계</b> 모든 칸으로 가정 범위를 넓히고, 두 갈래 모두에서 공통으로 나오는 결론을 채택.</li>
+        </ul>
+        <h3>3. 출제</h3>
+        <ul>
+          <li>정답지에서 칸을 무작위 순서로 지우되, <b>지운 뒤에도 해당 난이도의 논리 솔버가 끝까지 푸는 경우에만</b> 지운 상태를 유지한다. 논리만으로 완주된다는 것은 해가 유일하다는 뜻이므로, 유일해와 풀이 가능성이 동시에 보장된다.</li>
+          <li><b>쉬움과 보통은 1단계 소거 추론만으로 끝까지 풀리도록 출제한다.</b> 어느 시점에도 후보 3개가 직접 지워지는 칸이 반드시 존재하므로, 값을 가정해 보는 단계가 필요 없다. 두 난이도의 차이는 힌트 양이다 — 쉬움 50%, 보통 32%. 상단 태그에 <code>소거 추론만</code>으로 표시된다.</li>
+          <li>어려움만 2단계(한 칸에 값을 가정해 전파했을 때 모순이면 그 후보를 제거)를 허용하고 힌트 하한을 두지 않는다. 상단 태그에 <code>가정 추론 필요</code>로 표시된다.</li>
+        </ul>
+      </div>
+    </details>
+  </section>
+
+  <!-- ══════════════ 랭킹 ══════════════ -->
+  <section class="view" data-view="rank" hidden>
+    <div class="panel">
+      <div class="panel-head">
+        <h2>랭킹</h2>
+        <p>정사각 규격 네 종류 × 난이도 세 종류. 힌트를 쓰지 않고 완주한 기록만 오릅니다.</p>
+      </div>
+      <div class="picker" id="rankPicker">
+        <div class="picker-row" id="rankSizes" role="tablist" aria-label="규격"></div>
+        <div class="picker-row" id="rankLevels" role="tablist" aria-label="난이도"></div>
+      </div>
+      <div id="rankBody"></div>
+    </div>
+  </section>
+
+  <!-- ══════════════ 대전 ══════════════ -->
+  <section class="view" data-view="room" hidden>
+    <div id="roomBody"></div>
+  </section>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="veil" id="veil"><div class="card" id="card"></div></div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
