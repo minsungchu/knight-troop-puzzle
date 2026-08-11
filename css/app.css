@@ -181,3 +181,64 @@ table.tbl tr.me .name::before{content:"▸ "}
   .picker,.lobby-actions{padding:12px 14px}
   .panel-head{padding:15px 14px 12px}
 }
+
+/* ── 방 대화 ──
+   방에 있는 동안에만 나타나는 고정 독. 판을 풀면서도 말을 걸 수 있어야 하므로
+   탭과 무관하게 화면 오른쪽 아래에 붙는다. */
+.chat-dock{position:fixed; right:18px; bottom:18px; z-index:45; display:flex; flex-direction:column; align-items:flex-end; gap:8px}
+.chat-dock[hidden]{display:none}
+
+.chat-tab{
+  display:inline-flex; align-items:center; gap:8px;
+  font-family:var(--display); font-size:13.5px; color:var(--parch);
+  background:linear-gradient(#1d2c43,#121d2c); border:1px solid rgba(201,151,63,.45);
+  padding:9px 16px; border-radius:99px; cursor:pointer; transition:.16s;
+  box-shadow:0 10px 26px rgba(0,0,0,.5);
+}
+.chat-tab:hover{border-color:var(--brass); background:linear-gradient(#26374f,#182437)}
+.chat-tab:focus-visible{outline:2px solid var(--brass); outline-offset:2px}
+.chat-badge{
+  font-family:var(--mono); font-size:11px; font-variant-numeric:tabular-nums;
+  background:var(--brass); color:#1a1206; border-radius:99px; padding:1px 7px; font-weight:700;
+}
+
+.chat-body{
+  width:min(340px,calc(100vw - 36px)); display:flex; flex-direction:column;
+  background:linear-gradient(160deg,#1b2b42,#0d1626); border:1px solid rgba(201,151,63,.45);
+  border-radius:11px; box-shadow:0 24px 56px rgba(0,0,0,.62); overflow:hidden;
+}
+.chat-body[hidden]{display:none}
+.chat-head{
+  display:flex; align-items:baseline; gap:9px; flex-wrap:wrap;
+  padding:11px 14px; border-bottom:1px solid rgba(201,151,63,.2);
+}
+.chat-head b{font-family:var(--display); font-size:13.5px; color:var(--parch); font-weight:700}
+.chat-note{font-size:10.5px; color:var(--mist); letter-spacing:.04em; margin-left:auto}
+
+.chat-log{
+  height:250px; overflow-y:auto; overflow-x:hidden; padding:10px 12px;
+  display:flex; flex-direction:column; gap:7px; scrollbar-width:thin;
+}
+.chat-row{font-size:13px; line-height:1.55; word-break:break-word}
+.chat-who{color:var(--brass); font-size:11.5px; margin-right:7px; font-family:var(--mono)}
+.chat-row.mine .chat-who{color:var(--u2)}
+.chat-text{color:#d6e0ee}
+.chat-sys{font-size:11.5px; color:var(--mist); text-align:center; line-height:1.5; padding:2px 0}
+
+.chat-form{display:flex; gap:7px; padding:10px 12px; border-top:1px solid rgba(201,151,63,.2)}
+.chat-form input{
+  flex:1; min-width:0; font-family:var(--body); font-size:13.5px; color:var(--parch);
+  background:#0d1626; border:1px solid rgba(201,151,63,.3); padding:8px 11px; border-radius:5px;
+}
+.chat-form input:focus{outline:none; border-color:var(--brass); background:#111c2e}
+.chat-form input::placeholder{color:#5d7085}
+.chat-form .btn{font-size:12.5px; padding:8px 12px; white-space:nowrap}
+.chat-err{color:var(--u3); font-size:11.5px; margin:0; padding:0 12px 10px; min-height:1em}
+.chat-err:empty{display:none}
+
+@media (max-width:620px){
+  .chat-dock{right:10px; bottom:10px; left:10px; align-items:stretch}
+  .chat-tab{align-self:flex-end}
+  .chat-body{width:auto}
+  .chat-log{height:190px}
+}

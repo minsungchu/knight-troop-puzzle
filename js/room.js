@@ -11,6 +11,7 @@ import { ONLINE, LEVELS, PRESET_SIZES, ROOM_MAX_PLAYERS, PROGRESS_INTERVAL } fro
 import { client, uid, myName, onAuth, sessionValid, readableError, onKicked } from "./supabase.js";
 import { requireLogin } from "./auth.js";
 import { Game, readMatchSave } from "./game.js";
+import * as Chat from "./chat.js";
 
 let R = null;            // 현재 방 상태 (room_state 결과)
 let chan = null;         // Realtime 채널
@@ -182,12 +183,20 @@ function openCreate() {
   $("#mPriv").onclick = () => { priv = true; $("#mPriv").classList.add("on"); $("#mPub").classList.remove("on"); $("#mPassWrap").hidden = false; $("#mPass").focus(); };
   $("#mCancel").onclick = hideVeil;
 
+  // 오류를 알리려던 자리가 이미 사라졌을 수 있다(밀려남 안내가 창을 갈아 끼우는 등).
+  // 그때 여기서 다시 터지면 진짜 원인이 묻히므로, 자리가 없으면 토스트로 돌린다.
+  const mkErr = (msg) => {
+    const el = $("#mErr");
+    if (el) el.textContent = msg; else toast(msg);
+  };
+
   $("#mkForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const pass = $("#mPass").value.trim();
-    if (priv && !pass) { $("#mErr").textContent = "비밀방은 입장 암호가 필요합니다."; return; }
+    if (priv && !pass) { mkErr("비밀방은 입장 암호가 필요합니다."); return; }
 
     const go = $("#mGo"); go.disabled = true; go.textContent = "만드는 중…";
+    let roomId = null;
     try {
       if (!(await sessionValid())) throw new Error("세션이 만료되었습니다. 다시 로그인해 주세요.");
       const sb = await client();
@@ -196,12 +205,15 @@ function openCreate() {
         p_max: +$("#mMax").value, p_size: +$("#mSize").value, p_level: +$("#mLevel").value,
       });
       if (error) throw error;
-      hideVeil();
-      await enterRoom(data.id);
+      roomId = data.id;
     } catch (e2) {
-      $("#mErr").textContent = readableError(e2);
-      go.disabled = false; go.textContent = "만들기";
+      mkErr(readableError(e2));
+      if ($("#mGo")) { go.disabled = false; go.textContent = "만들기"; }
+      return;
     }
+    // 방은 만들어졌다. 들어가다 실패하더라도 위의 폼 오류로 되돌리지 않는다.
+    hideVeil();
+    await enterRoom(roomId);
   });
 }
 
@@ -223,13 +235,19 @@ function openJoinByCode(prefill) {
   $("#jCancel").onclick = hideVeil;
   if (prefill) $("#jPass").focus();
 
+  const jErr = (msg) => {
+    const el = $("#jErr");
+    if (el) el.textContent = msg; else toast(msg);
+  };
+
   $("#jForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const code = $("#jCode").value.trim().toUpperCase();
-    if (code.length !== 6) { $("#jErr").textContent = "코드는 6자리입니다."; return; }
+    if (code.length !== 6) { jErr("코드는 6자리입니다."); return; }
     const go = $("#jGo"); go.disabled = true; go.textContent = "입장 중…";
     const ok = await doJoin(code, $("#jPass").value.trim(), (m) => {
-      $("#jErr").textContent = m; go.disabled = false; go.textContent = "입장";
+      jErr(m);
+      if ($("#jGo")) { go.disabled = false; go.textContent = "입장"; }
     });
     if (ok) hideVeil();
   });
@@ -274,6 +292,7 @@ async function enterRoom(id, opts) {
 
   await openChannel();
   stopLobbyPolling();
+  Chat.mount(sendChat, R.title);
 
   // 이미 진행 중인 방이면 판을 되살린다
   if (R.status === "playing" && R.puzzle && !Game.isMatch()) {
@@ -314,12 +333,20 @@ async function openChannel() {
     renderSeats();
   });
 
+  // 채팅 — 어디에도 저장하지 않고 이 채널로만 흐른다
+  chan.on("broadcast", { event: "chat" }, ({ payload }) => {
+    if (!payload || !payload.u || payload.u === uid()) return;   // 내 것은 보낼 때 이미 띄웠다
+    const who = R.players.find((p) => p.user_id === payload.u);
+    Chat.receive({ name: who ? who.username : "알 수 없음", text: payload.t, mine: false });
+  });
+
   chan.on("broadcast", { event: "finish" }, ({ payload }) => {
     if (!payload || !payload.u) return;
     const s = live[payload.u] || (live[payload.u] = {});
     s.done = true; s.ms = payload.ms; s.filled = total(); s.rank = payload.r;
     const who = (R.players.find((p) => p.user_id === payload.u) || {}).username || "누군가";
     toast(`${who} 완주 — ${fmt(payload.ms)} (${payload.r}위)`);
+    Chat.system(`${who} 님이 ${fmt(payload.ms)} 만에 완주했습니다 (${payload.r}위).`);
     renderSeats();
   });
 
@@ -343,6 +370,13 @@ async function refreshState() {
   const { data } = await sb.rpc("room_state", { p_room: R.id });
   if (!data) { hardLeave(); return; }
   const wasWaiting = R.status === "waiting";
+
+  // 누가 들어오고 나갔는지 대화창에 남긴다
+  const before = new Set(R.players.map((p) => p.username));
+  const after = new Set(data.players.map((p) => p.username));
+  after.forEach((n) => { if (!before.has(n)) Chat.system(`${n} 님이 들어왔습니다.`); });
+  before.forEach((n) => { if (!after.has(n)) Chat.system(`${n} 님이 나갔습니다.`); });
+
   R = data;
   R.players.forEach((p) => {
     const s = live[p.user_id] || (live[p.user_id] = { filled: 0, hints: 0, done: false, ms: 0 });
@@ -499,6 +533,7 @@ function beginMatch(p) {
   };
 
   if (p.late) { startNow(); toast("이미 시작된 대전에 합류했습니다."); return; }
+  Chat.system("대전이 시작되었습니다.");
 
   let n = 3;
   $("#veil").dataset.locked = "1";
@@ -513,6 +548,12 @@ function beginMatch(p) {
     }
   };
   tick();
+}
+
+/** 채팅 한 줄 내보내기. 내 화면에는 바로 띄우고, 채널로 흘려보낸다. */
+function sendChat(text) {
+  Chat.receive({ name: myName(), text, mine: true });
+  if (chan) chan.send({ type: "broadcast", event: "chat", payload: { u: uid(), t: text } });
 }
 
 /* ══════════════ 진행률 · 완주 ══════════════ */
@@ -611,6 +652,7 @@ async function doLeave() {
 
 function hardLeave() {
   closeChannel();
+  Chat.unmount();                 // 남은 대화를 버린다
   R = null; live = {}; online = new Set(); base = 0;
   Game.endMatch();
   $("#matchBar").hidden = true;
