@@ -219,10 +219,17 @@ function fit() {
 
 /* ══════════════ 렌더 ══════════════ */
 
-function renderCell(i, badSet) {
+/** 나이트 사정거리를 밝힐 기준 칸.
+    부대가 놓인 칸(처음 주어진 칸·내가 확정한 칸)을 고를 때만 켜진다.
+    빈 칸에서 후보 숫자를 지우려고 누른 것까지 사정거리로 읽으면 방해가 된다. */
+function linkSource() {
+  return (S.sel >= 0 && S.values[S.sel]) ? S.sel : -1;
+}
+
+function renderCell(i, badSet, src) {
   const t = S.tiles[i], v = S.values[i];
   t.className = "tile" + (v ? ` filled v${v}` : "") + (S.given[i] ? " given" : (v ? " placed" : ""))
-    + (S.sel === i ? " sel" : "") + (S.sel >= 0 && S.geom.knight[S.sel].indexOf(i) >= 0 ? " link" : "")
+    + (S.sel === i ? " sel" : "") + (src >= 0 && S.geom.knight[src].indexOf(i) >= 0 ? " link" : "")
     + (badSet && badSet.has(i) ? " bad" : "") + (S.hi.t === i ? " pick" : "") + (S.hi.w.indexOf(i) >= 0 ? " why" : "");
   if (v) {
     t.querySelector("use").setAttribute("href", "#u" + v);
@@ -240,7 +247,8 @@ function renderCell(i, badSet) {
 
 function renderAll() {
   const bad = KP.violations(S.geom, S.values);   // 규칙을 실제로 어긴 칸만 표시(정답 여부는 알리지 않는다)
-  for (let i = 0; i < S.geom.N; i++) renderCell(i, bad);
+  const src = linkSource();
+  for (let i = 0; i < S.geom.N; i++) renderCell(i, bad, src);
 
   let filled = 0; const cnt = [0, 0, 0, 0, 0];
   for (let i = 0; i < S.geom.N; i++) if (S.values[i]) { filled++; cnt[S.values[i]]++; }
