@@ -20,8 +20,9 @@ export const ONLINE = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
 /** 한 판에 쓸 수 있는 힌트 횟수 */
 export const HINT_MAX = 5;
 
-/** 랭킹 보드가 있는 규격 (정사각만) */
-export const PRESET_SIZES = [6, 8, 10, 12];
+/** 랭킹 보드가 있는 규격 — 정사각 전부.
+ *  가로·세로가 다른 판은 순위를 매기지 않는다(기록은 '내 기록'에 남는다). */
+export const PRESET_SIZES = [5, 6, 7, 8, 9, 10, 11, 12];
 
 /** 난이도 이름 */
 export const LEVELS = { 1: "쉬움", 2: "보통", 3: "어려움" };
