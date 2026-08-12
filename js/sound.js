@@ -23,24 +23,46 @@ export function setMuted(v) {
   if (master) master.gain.value = muted ? 0 : 0.9;
 }
 
-/** 첫 조작 때 한 번 깨운다. 그 전에는 아무 소리도 낼 수 없다. */
+/** 오디오를 깨운다. 조작이 있을 때마다 불러도 되고, 여러 번 불러도 안전하다.
+ *
+ *  한 번만 시도하면 안 된다. 컨텍스트가 suspended 로 만들어지는 경우가 있고,
+ *  resume() 은 비동기라 그 자리에서 성공한다는 보장이 없다. 한 번 실패한 뒤
+ *  다시 시도할 기회가 없으면 소리가 영영 안 난다 — 소리 켜기를 껐다 켜야만
+ *  들리던 증상이 이것이었다(그 경로가 wake 를 다시 불러 주고 있었다). */
 export function wake() {
-  if (ctx) { if (ctx.state === "suspended") ctx.resume(); return; }
-  const AC = window.AudioContext || window.webkitAudioContext;
-  if (!AC) return;
-  ctx = new AC();
-  master = ctx.createGain();
-  master.gain.value = muted ? 0 : 0.9;
-  master.connect(ctx.destination);
-  // 갓 만든 컨텍스트가 suspended 로 시작하는 브라우저가 있다. 깨우지 않으면
-  // ready() 가 영원히 false 라 소리가 하나도 안 난다.
-  if (ctx.state !== "running") ctx.resume();
+  if (!ctx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    ctx = new AC();
+    master = ctx.createGain();
+    master.gain.value = muted ? 0 : 0.9;
+    master.connect(ctx.destination);
 
-  // 잡음 한 조각을 미리 만들어 두고 돌 부딪는 소리의 재료로 재활용한다
-  const n = ctx.sampleRate * 0.4;
-  noiseBuf = ctx.createBuffer(1, n, ctx.sampleRate);
-  const d = noiseBuf.getChannelData(0);
-  for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    // 잡음 한 조각을 미리 만들어 두고 돌 부딪는 소리의 재료로 재활용한다
+    const n = ctx.sampleRate * 0.4;
+    noiseBuf = ctx.createBuffer(1, n, ctx.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+  }
+  if (ctx.state !== "running") ctx.resume().catch(() => {});
+}
+
+/** 사용자가 화면을 건드릴 때마다, 소리가 살아날 때까지 깨우기를 다시 시도한다.
+ *  살아나면 스스로 물러난다. */
+export function listenForGesture() {
+  const events = ["pointerdown", "keydown", "touchstart", "click"];
+  const on = () => {
+    wake();
+    if (ctx && ctx.state === "running") {
+      events.forEach((e) => window.removeEventListener(e, on, true));
+    }
+  };
+  events.forEach((e) => window.addEventListener(e, on, true));
+
+  // 다른 탭에 갔다 오면 브라우저가 다시 재울 수 있다
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && ctx && ctx.state === "suspended") ctx.resume().catch(() => {});
+  });
 }
 
 const ready = () => ctx && ctx.state === "running" && !muted;

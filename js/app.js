@@ -9,10 +9,8 @@ import * as Sfx from "./sound.js";
 $$(".tab").forEach((b) => { b.onclick = () => showTab(b.dataset.tab); });
 
 /* 소리 — 브라우저는 사용자가 화면을 건드리기 전에는 소리를 못 내게 막는다.
-   첫 조작에서 한 번만 깨우고 그 뒤로는 신경 쓰지 않는다. */
-const wake = () => Sfx.wake();
-["pointerdown", "keydown"].forEach((e) =>
-  window.addEventListener(e, wake, { once: true, capture: true }));
+   한 번만 시도하면 놓칠 수 있어, 살아날 때까지 조작마다 다시 깨운다. */
+Sfx.listenForGesture();
 
 const soundBox = $("#optSound");
 soundBox.checked = !Sfx.isMuted();

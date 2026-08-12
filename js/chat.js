@@ -45,6 +45,7 @@ export function mount(send, title) {
   }
   dock.hidden = false;
   dock.innerHTML = `
+    <div class="chat-pop" id="chatPop" aria-live="polite"></div>
     <button class="chat-tab" id="chatTab" aria-expanded="${open}">
       <span>대화</span><span class="chat-badge" id="chatBadge" hidden>0</span>
     </button>
@@ -80,7 +81,7 @@ function toggle() {
   const body = $("#chatBody");
   if (body) body.hidden = !open;
   $("#chatTab").setAttribute("aria-expanded", String(open));
-  if (open) { unread = 0; badge(); scrollDown(); $("#chatInput")?.focus(); }
+  if (open) { unread = 0; badge(); clearBubbles(); scrollDown(); $("#chatInput")?.focus(); }
 }
 
 function badge() {
@@ -111,8 +112,36 @@ function push(row) {
   rows.push(row);
   if (rows.length > MAX_KEEP) rows.splice(0, rows.length - MAX_KEEP);
   render();
-  if (!open && row.kind !== "system") { unread++; badge(); }
+  if (!open && row.kind !== "system") { unread++; badge(); popBubble(row); }
 }
+
+/* ── 접혀 있을 때의 말풍선 ──
+   창을 닫아 둔 채 판을 풀고 있으면 배지 숫자만으로는 누가 뭘 말했는지 모른다.
+   짧게 띄웠다 스스로 사라지고, 누르면 대화창이 열린다. */
+const BUBBLE_MS = 5000;
+const BUBBLE_MAX = 3;
+const BUBBLE_CHARS = 42;
+
+function popBubble(row) {
+  const box = $("#chatPop");
+  if (!box) return;
+  const short = row.text.length > BUBBLE_CHARS ? row.text.slice(0, BUBBLE_CHARS - 1) + "…" : row.text;
+
+  const el = document.createElement("div");
+  el.className = "chat-bubble";
+  el.innerHTML = `<b>${esc(row.name)}</b>${esc(short)}`;
+  el.title = "누르면 대화창이 열립니다";
+  el.addEventListener("click", () => { if (!open) toggle(); });
+  box.appendChild(el);
+
+  while (box.childElementCount > BUBBLE_MAX) box.firstElementChild.remove();
+  setTimeout(() => {
+    el.classList.add("out");
+    setTimeout(() => el.remove(), 300);
+  }, BUBBLE_MS);
+}
+
+const clearBubbles = () => { const b = $("#chatPop"); if (b) b.innerHTML = ""; };
 
 /** 안내문. 상대에게 전송되지 않고 내 화면에만 남는다. */
 export function system(text) {

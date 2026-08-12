@@ -243,3 +243,35 @@ table.tbl tr.me .name::before{content:"▸ "}
   .chat-log{height:190px}
 }
 
+
+/* ── 접혀 있을 때 뜨는 말풍선 ──
+   대화창을 닫고 판을 푸는 동안 배지 숫자만으로는 무슨 말이 오갔는지 알 수 없다.
+   짧게 떴다 스스로 사라지고, 누르면 대화창이 열린다. */
+.chat-pop{display:flex; flex-direction:column; align-items:flex-end; gap:6px; max-width:min(300px,72vw)}
+.chat-pop:empty{display:none}
+
+.chat-bubble{
+  position:relative; cursor:pointer; text-align:left;
+  background:linear-gradient(#22334c,#152134); border:1px solid rgba(201,151,63,.5);
+  border-radius:11px 11px 3px 11px; padding:8px 12px;
+  font-size:12.5px; line-height:1.45; color:#d6e0ee;
+  box-shadow:0 10px 26px rgba(0,0,0,.55);
+  animation:bubble-in .26s cubic-bezier(.2,.9,.3,1);
+  word-break:break-word;
+}
+.chat-bubble b{display:block; color:var(--brass); font-family:var(--mono); font-size:11px; font-weight:400; margin-bottom:2px}
+.chat-bubble:hover{border-color:var(--brass)}
+/* 꼬리 — 아래 오른쪽의 대화 단추를 가리킨다 */
+.chat-bubble::after{
+  content:""; position:absolute; right:14px; bottom:-6px;
+  border:6px solid transparent; border-top-color:#152134; border-bottom:0;
+}
+.chat-bubble.out{animation:bubble-out .3s ease-in forwards}
+
+@keyframes bubble-in{from{opacity:0; transform:translateY(8px) scale(.96)} to{opacity:1; transform:none}}
+@keyframes bubble-out{to{opacity:0; transform:translateY(-4px) scale(.98)}}
+
+@media (prefers-reduced-motion:reduce){
+  .chat-bubble{animation:none}
+  .chat-bubble.out{animation:none; opacity:0}
+}
