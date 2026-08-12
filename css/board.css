@@ -1,6 +1,8 @@
 /* 전장 판(3D) · 부대 팔레트 · 도구 · 안내문 */
 /* ── 전장(3D) ── */
-.stage{perspective:1500px; perspective-origin:50% 42%; padding:30px 0 8px; display:flex; justify-content:center}
+/* 아래 여백은 받침대 그림자(0 40px 70px)가 아래 항목들을 덮지 않도록 벌려 둔 것이다.
+   그림자는 판 밑으로 100px 남짓 퍼지므로 8px 만으로는 팔레트가 그늘에 들어간다. */
+.stage{perspective:1500px; perspective-origin:50% 42%; padding:30px 0 64px; display:flex; justify-content:center}
 .board{position:relative; transform:rotateX(var(--tilt,18deg)); transform-style:preserve-3d; transition:transform .25s ease-out}
 .plinth{
   position:absolute; inset:-22px; border-radius:12px; transform:translateZ(-16px);
@@ -174,7 +176,7 @@ summary{cursor:pointer; padding:13px 16px; font-family:var(--display); font-size
 .tile.why .face{box-shadow:0 4px 0 #131d29,0 8px 0 #0e1621,0 14px 22px rgba(0,0,0,.6),0 0 0 2px var(--brass),0 0 22px rgba(201,151,63,.5)}
 
 @media (max-width:620px){
-  .stage{perspective:900px; padding:18px 0 4px}
+  .stage{perspective:900px; padding:18px 0 44px}
   .troop .nm{display:none}
 }
 

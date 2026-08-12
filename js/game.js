@@ -8,6 +8,7 @@
 import KP from "./engine.js";
 import { $, toast, veil, hideVeil, isVeilOpen, currentTab, onTab, Store, fmt } from "./ui.js";
 import { HINT_MAX, LEVELS, TROOPS, STORE_KEY } from "./config.js";
+import * as Sfx from "./sound.js";
 
 const bit = (v) => 1 << (v - 1);
 const MATCH_KEY = STORE_KEY + ":match";
@@ -83,13 +84,22 @@ function bindEvents() {
     const i = +t.dataset.i;
     if (c && !S.values[i]) {
       if (S.pick) { place(i, S.pick); select(i); return; }
-      select(i); toggleCand(i, +c.dataset.v); return;
+      select(i, true); toggleCand(i, +c.dataset.v); return;
     }
     if (S.pick && !S.values[i]) { place(i, S.pick); select(i); return; }
     select(i);
   });
 
   $("#grid").addEventListener("focus", () => { if (S.sel < 0) select(0); });
+
+  // 칸이 바뀔 때만 울린다 — 한 칸 안에서 움직이는 동안 계속 나면 시끄럽다
+  let hoverAt = -1;
+  $("#grid").addEventListener("pointermove", (e) => {
+    const t = e.target.closest(".tile");
+    const i = t ? +t.dataset.i : -1;
+    if (i !== hoverAt) { hoverAt = i; if (i >= 0) Sfx.hover(); }
+  });
+  $("#grid").addEventListener("pointerleave", () => { hoverAt = -1; });
 
   document.addEventListener("keydown", (e) => {
     if (!S.geom) return;
@@ -390,6 +400,7 @@ function place(i, v) {
   // 방금 놓은 말만 떨어지는 시늉을 한다
   const t = S.tiles[i];
   if (t) { t.classList.add("just"); setTimeout(() => t.classList.remove("just"), 360); }
+  Sfx.place();
   emit("progress", snapshot());
   checkWin();
 }
@@ -397,6 +408,7 @@ function place(i, v) {
 function unplace(i) {
   if (S.given[i] || !S.values[i] || S.done) return;
   snap();
+  Sfx.unplace();
   S.values[i] = 0; S.cands[i] = 15;
   renderAll(); save();
   emit("progress", snapshot());
@@ -410,9 +422,11 @@ function toggleCand(i, v) {
     if (KP.POP[S.cands[i]] === 1) { place(i, v); return; }
     snap();
     S.cands[i] &= ~b;
+    Sfx.candOff();
   } else {
     snap();
     S.cands[i] |= b;
+    Sfx.candOn();
   }
   renderAll(); save();
 }
@@ -421,6 +435,7 @@ function toggleCand(i, v) {
 function undo() {
   if (S.done || !undoStack.length) return;
   const prev = undoStack.pop();
+  Sfx.unplace();
   S.values.set(prev.values);
   S.cands.set(prev.cands);
   clearHi(); guide = -1;
@@ -428,7 +443,8 @@ function undo() {
   emit("progress", snapshot());
 }
 
-function select(i) {
+function select(i, quiet) {
+  if (i !== S.sel && !quiet) Sfx.select();
   if (S.hi.t >= 0 && S.hi.t !== i) { clearHi(); guide = -1; }
   S.sel = i;
   renderAll();
@@ -502,6 +518,7 @@ function onHint() {
 
   // 새 칸을 짚는다 — 여기서만 1회 차감
   S.hints++;
+  Sfx.hint();
   const left = HINT_MAX - S.hints;
   const pick = list[(Math.random() * list.length) | 0];
   guide = pick.i; S.hi = { t: pick.i, w: [] }; S.sel = pick.i;
@@ -524,6 +541,7 @@ function checkWin() {
   // 알려 준 조건 그대로다 — 혹시라도 해가 둘인 판이 나오면 이쪽이 옳게 인정한다.
   if (!KP.checkSolution(S.geom, S.values)) return;
   S.done = true;
+  Sfx.win();
   stopClock();
   save();
   const result = snapshot();
