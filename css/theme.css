@@ -21,15 +21,23 @@
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
 body{
-  min-height:100vh; background:
-    radial-gradient(1100px 700px at 50% -12%, #1c2c46 0%, transparent 62%),
-    radial-gradient(700px 500px at 88% 108%, #14263b 0%, transparent 60%),
-    var(--void);
+  min-height:100vh; background:var(--void);
   color:var(--parch); font-family:var(--body); -webkit-font-smoothing:antialiased;
   overflow-x:hidden;
 }
+
+/* 배경 그림 — 내용 뒤에 고정으로 깔린다. 스크롤해도 따라오지 않는다. */
+.scene{
+  position:fixed; inset:0; z-index:-2; pointer-events:none;
+  background:url("../img/battlefield.svg") center bottom / cover no-repeat;
+}
+/* 글이 배경 위로 확실히 뜨도록 한 겹 더 눌러 준다 */
+.scene::after{
+  content:""; position:absolute; inset:0;
+  background:linear-gradient(180deg, rgba(8,13,22,.42) 0%, rgba(8,13,22,.14) 46%, rgba(8,13,22,.34) 100%);
+}
 body::before{
-  content:""; position:fixed; inset:0; pointer-events:none; opacity:.5;
+  content:""; position:fixed; inset:0; pointer-events:none; opacity:.22;
   background-image:radial-gradient(rgba(201,151,63,.14) 1px, transparent 1px);
   background-size:34px 34px; mask-image:radial-gradient(circle at 50% 30%, #000 0%, transparent 78%);
 }
