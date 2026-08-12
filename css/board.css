@@ -40,7 +40,7 @@
 .tile.bad .face{box-shadow:0 4px 0 #2a0d14,0 8px 0 #1c0910,0 14px 22px rgba(0,0,0,.6),0 0 0 2px #e0576d,0 0 24px rgba(224,87,109,.5)}
 
 /* 배치된 부대 */
-.unit{display:none; flex-direction:column; align-items:center; justify-content:center; gap:1px; line-height:1}
+.unit{display:none; flex-direction:column; align-items:center; justify-content:center; gap:0; line-height:1}
 .tile.filled .unit{display:flex}
 .tile.filled .cands{display:none}
 .tile.filled .face{--z:22px}
@@ -64,7 +64,7 @@
 .unit{position:relative; transform:translateZ(var(--lift,6px)); transform-style:preserve-3d}
 
 .unit svg{
-  width:calc(var(--cell) * .44); height:calc(var(--cell) * .44);
+  width:calc(var(--cell) * .54); height:calc(var(--cell) * .54);
   fill:currentColor;
   /* 아래로 겹쳐 쌓아 옆면처럼 보이게 한다 — 화면 높이는 늘지 않는다.
      한 겹당 1px 씩 여덟 겹, 아래로 갈수록 어두워져 두께로 읽힌다. */
@@ -104,7 +104,7 @@
 }
 .tile.just .unit{animation:drop-in .34s cubic-bezier(.3,1.3,.5,1)}
 .unit .num{
-  font-family:var(--latin); font-weight:700; font-size:calc(var(--cell) * .24);
+  font-family:var(--latin); font-weight:700; font-size:calc(var(--cell) * .21);
   font-variant-numeric:tabular-nums; color:#f6ecd6; position:relative; z-index:2;
   text-shadow:0 1px 0 var(--ucd2), 0 2px 3px rgba(0,0,0,.9);
 }
@@ -118,7 +118,10 @@
 .tile.given .unit{filter:none}
 
 /* 후보 표시 */
-.cands{display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; width:100%; height:100%}
+/* 아래쪽 여백은 기울어진 판에서 아랫줄 말이 이 숫자를 덮지 않도록 벌어 둔 자리다.
+   이만큼이 말과 타일을 얼마나 띄울 수 있는지의 예산이 된다(game.js setTilt 참고). */
+.cands{display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr;
+  width:100%; height:100%; padding-bottom:10%}
 .c{
   display:flex; align-items:center; justify-content:center; cursor:pointer;
   font-family:var(--latin); font-weight:600; font-size:calc(var(--cell) * .26);

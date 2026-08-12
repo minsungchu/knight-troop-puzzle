@@ -237,14 +237,20 @@ function setTilt(deg) {
 
   const cell = parseFloat(getComputedStyle(root).getPropertyValue("--cell")) || 52;
   const gap = parseFloat(getComputedStyle(root).getPropertyValue("--gap")) || 5;
-  const glyph = cell * 0.26;
-  const slack = gap + (cell / 2 - glyph) / 2 + glyph * 0.15;   // 윗줄 숫자까지의 여백
+
+  // 아래줄 후보 숫자의 밑변에서 칸 밑변까지의 여백. 브라우저에서 잰 값이며
+  // .cands 의 padding-bottom 이 이 여백을 만든다 — 둘은 함께 움직인다.
+  // 글자 상자(1/4칸)가 아니라 글자 자체를 기준으로 재야 한다.
+  const inset = cell * 0.132;
+  // 0.62 는 원근(perspective) 때문에 띄운 칸이 커지는 몫을 덜어 둔 여유다.
+  // 각도별로 0건이 되는 한계를 실측해 정했다 — 이론값만으로는 3px 남짓 낙관적이 된다.
+  const slack = (gap + inset) * 0.62;
   const sin = Math.sin((deg * Math.PI) / 180);
 
   // 면 높이와 말 높이를 합쳐 여유 안에 들어오게 나눈다.
   // 여유가 넉넉하면 원래 값(면 26px + 말 10px)을 그대로 쓴다.
   const allowed = sin < 0.02 ? 999 : slack / sin;
-  const faceZ = Math.max(10, Math.min(26, allowed));
+  const faceZ = Math.max(4, Math.min(26, allowed));
   const lift = Math.max(0, Math.min(10, allowed - faceZ));
 
   root.style.setProperty("--placed-z", faceZ.toFixed(1) + "px");
