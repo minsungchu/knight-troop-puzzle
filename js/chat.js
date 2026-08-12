@@ -117,15 +117,19 @@ function push(row) {
 
 /* ── 접혀 있을 때의 말풍선 ──
    창을 닫아 둔 채 판을 풀고 있으면 배지 숫자만으로는 누가 뭘 말했는지 모른다.
-   짧게 띄웠다 스스로 사라지고, 누르면 대화창이 열린다. */
+   한 번에 하나만 띄운다 — 여러 개가 쌓이면 판을 가리고, 어차피 최신 말이 궁금하다.
+   새 말이 오면 앞의 것을 덮어쓰고 시계도 처음부터 다시 센다. */
 const BUBBLE_MS = 5000;
-const BUBBLE_MAX = 3;
 const BUBBLE_CHARS = 42;
+let bubbleTimer = null;
 
 function popBubble(row) {
   const box = $("#chatPop");
   if (!box) return;
   const short = row.text.length > BUBBLE_CHARS ? row.text.slice(0, BUBBLE_CHARS - 1) + "…" : row.text;
+
+  clearTimeout(bubbleTimer);
+  box.replaceChildren();                    // 앞의 말풍선은 즉시 치운다
 
   const el = document.createElement("div");
   el.className = "chat-bubble";
@@ -134,14 +138,17 @@ function popBubble(row) {
   el.addEventListener("click", () => { if (!open) toggle(); });
   box.appendChild(el);
 
-  while (box.childElementCount > BUBBLE_MAX) box.firstElementChild.remove();
-  setTimeout(() => {
+  bubbleTimer = setTimeout(() => {
     el.classList.add("out");
     setTimeout(() => el.remove(), 300);
   }, BUBBLE_MS);
 }
 
-const clearBubbles = () => { const b = $("#chatPop"); if (b) b.innerHTML = ""; };
+const clearBubbles = () => {
+  clearTimeout(bubbleTimer);
+  const b = $("#chatPop");
+  if (b) b.replaceChildren();
+};
 
 /** 안내문. 상대에게 전송되지 않고 내 화면에만 남는다. */
 export function system(text) {
