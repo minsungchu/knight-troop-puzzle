@@ -345,17 +345,13 @@ function renderAll() {
   renderHintBtn();
 }
 
-/** 규칙을 어긴 칸 수를 상태줄에 띄우고, 열 칸을 넘어서는 순간 한 번 경고한다.
-    붉은 칸이 늘어난 걸 모르고 계속 두는 경우가 많아 눈에 띄게 알려 준다. */
+/** 규칙을 어긴 칸이 열 개까지 쌓이면 한 번 알려 준다.
+    한두 칸은 풀다 보면 늘 생기는 것이라 셀 때마다 알리지 않는다 —
+    붉은 칸이 그대로 쌓여 이후 추론이 통째로 어긋나는 경우만 잡는다. */
 const BAD_WARN_AT = 10;
 let warnedBad = false;
 
 function reportBad(n) {
-  const tag = $("#stBad");
-  if (tag) {
-    tag.hidden = n === 0;
-    tag.textContent = `규칙 위반 ${n}칸`;
-  }
   if (n >= BAD_WARN_AT && !warnedBad) {
     warnedBad = true;
     toast(`규칙을 어긴 칸이 ${n}개입니다. 되돌리기로 정리해 보세요.`);
