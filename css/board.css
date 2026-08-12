@@ -21,8 +21,17 @@
 .face::after{content:""; position:absolute; inset:0; border-radius:6px; border:1px solid rgba(255,255,255,.07); pointer-events:none}
 .tile:hover .face{--zh:8px}
 .tile.sel .face{box-shadow:0 1px 0 #1a2637,0 4px 0 #131d29,0 8px 0 #0e1621,0 14px 22px rgba(0,0,0,.6),0 0 0 2px var(--brass),0 0 26px rgba(201,151,63,.55); --z:10px}
-.tile.link .face{background:linear-gradient(150deg,#3a4a64,#2a3a52)}
-.tile.link .face::after{border-color:rgba(201,151,63,.55)}
+/* 나이트가 닿는 칸 — 부대가 놓인 칸을 고를 때만 켜진다.
+   살짝 떠오르고 놋쇠빛이 번지게 해서 한눈에 사정거리가 읽히도록 한다. */
+.tile.link .face{
+  --zh:6px;
+  background:linear-gradient(150deg,#6a5a2f,#3d3419);
+  box-shadow:0 1px 0 #2a2415,0 3px 0 #221d11,0 6px 0 #19150c,0 12px 20px rgba(0,0,0,.55),
+             0 0 0 1.5px rgba(224,180,92,.85), 0 0 22px -2px rgba(240,196,94,.75);
+}
+.tile.link .face::after{border-color:rgba(240,196,94,.9)}
+.tile.link .c{opacity:1; color:#f4e6c4}
+.tile.link .c.off{opacity:.22}
 .tile.bad .face{box-shadow:0 4px 0 #2a0d14,0 8px 0 #1c0910,0 14px 22px rgba(0,0,0,.6),0 0 0 2px #e0576d,0 0 24px rgba(224,87,109,.5)}
 
 /* 배치된 부대 */

@@ -44,8 +44,9 @@ const authListeners = [];
 export function onAuth(fn) { authListeners.push(fn); fn(me); }
 const fireAuth = () => authListeners.forEach((fn) => { try { fn(me); } catch (e) { console.error(e); } });
 
-/** 세션에서 사용자와 프로필을 다시 읽는다. */
-export async function refresh() {
+/** 세션에서 사용자와 프로필을 다시 읽는다.
+ *  @param {{claim?:boolean}} [opts] claim 이면 이 탭이 자리를 새로 가져간다(로그인 직후). */
+export async function refresh(opts) {
   const sb = await client();
   if (!sb) { me.user = null; me.profile = null; fireAuth(); return me; }
 
@@ -69,10 +70,11 @@ export async function refresh() {
 
   fireAuth();
   if (me.profile) {
-    // 새 탭은 로그인 상태만 물려받고 자리 표는 없다 — 여기서 자리를 이어받아
-    // 먼저 열려 있던 탭을 물러나게 한다. 같은 탭 새로고침은 표가 남아 있어 그대로다.
-    if (!TabStore.get(SESSION_KEY)) claimSession();
-    else watchSession();
+    // 나중에 로그인한 쪽이 자리를 가져간다. 새 탭은 로그인 상태만 물려받고 표가 없으므로
+    // 여기서도 가져간다. 같은 탭 새로고침은 표가 남아 있어 그대로 앉아 있는다.
+    // 반드시 await 한다 — 던져 놓으면 아래 claim 과 순서가 뒤바뀌어 자기 표를 스스로 무효화한다.
+    if (opts?.claim || !TabStore.get(SESSION_KEY)) await claimSession();
+    else await watchSession();
   }
   return me;
 }
@@ -98,8 +100,17 @@ const kickListeners = [];
 /** 다른 기기에 밀려났을 때 호출된다. */
 export function onKicked(fn) { kickListeners.push(fn); }
 
-/** 로그인 직후 이 기기를 '현재 자리'로 등록한다. */
-export async function claimSession() {
+/** 로그인 직후 이 탭을 '현재 자리'로 등록한다. 나중에 부른 쪽이 이긴다.
+ *  겹쳐 부르면 하나로 합친다 — 두 번 발급하면 어느 쪽이 DB 에 늦게 닿는지 알 수 없어
+ *  이 탭이 자기 표를 스스로 무효화하는 일이 생긴다. */
+let claiming = null;
+export function claimSession() {
+  if (claiming) return claiming;
+  claiming = doClaim().finally(() => { claiming = null; });
+  return claiming;
+}
+
+async function doClaim() {
   const sb = await client();
   if (!sb || !uid()) return;
   const token = crypto.randomUUID();

@@ -1,7 +1,7 @@
 /* 로그인 · 가입 · 계정 메뉴 */
 import { $, esc, veil, hideVeil, toast } from "./ui.js";
 import { ONLINE, RESERVED_IDS } from "./config.js";
-import { client, me, myName, onAuth, refresh, signOut, claimSession, toEmail, readableError, onKicked } from "./supabase.js";
+import { client, me, myName, onAuth, refresh, signOut, toEmail, readableError, onKicked } from "./supabase.js";
 
 /* ══════════════ 입력 검증 ══════════════ */
 
@@ -160,8 +160,8 @@ function openForm(mode, reason) {
         if (error) throw error;
       }
 
-      await refresh();
-      await claimSession();
+      // refresh 가 자리 가져오기까지 맡는다. 따로 한 번 더 부르면 순서가 뒤바뀔 수 있다.
+      await refresh({ claim: true });
       hideVeil();
       toast(signup ? `${id} 계정을 만들었습니다.` : `${id} 님, 어서 오세요.`);
     } catch (e2) {

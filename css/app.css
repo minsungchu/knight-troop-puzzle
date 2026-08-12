@@ -242,3 +242,6 @@ table.tbl tr.me .name::before{content:"▸ "}
   .chat-body{width:auto}
   .chat-log{height:190px}
 }
+
+/* 규칙을 어긴 칸 수 알림 */
+.tag.bad{color:var(--u3); border-color:rgba(224,87,109,.55); background:rgba(224,87,109,.08)}

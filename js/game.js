@@ -25,6 +25,17 @@ const S = {
 let guide = -1;
 const listeners = { progress: [], win: [], hint: [] };
 
+/* ── 되돌리기 ──
+   판이 작아서 한 수마다 통째로 찍어 두는 편이 값싸고 확실하다.
+   12×12 라도 한 장에 288바이트, 120수면 35KB 남짓. */
+const UNDO_MAX = 120;
+let undoStack = [];
+const clearUndo = () => { undoStack = []; };
+function snap() {
+  undoStack.push({ values: S.values.slice(), cands: S.cands.slice() });
+  if (undoStack.length > UNDO_MAX) undoStack.shift();
+}
+
 export const Game = { init, newGame, startMatch, endMatch, isMatch, snapshot, on, regenerate };
 
 function on(evt, fn) { (listeners[evt] || []).push(fn); }
@@ -85,6 +96,9 @@ function bindEvents() {
     if (isVeilOpen() || currentTab() !== "game") return;
     const tag = e.target.tagName;
     if (tag === "SELECT" || tag === "INPUT" || tag === "TEXTAREA") return;
+
+    // 되돌리기는 칸을 고르지 않았어도 먹는다
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); return; }
     if (e.metaKey || e.ctrlKey || e.altKey) return;
 
     if (S.sel < 0) { if (e.key.startsWith("Arrow")) { e.preventDefault(); select(0); } return; }
@@ -95,6 +109,7 @@ function bindEvents() {
     } else if (e.key === "Backspace" || e.key === "Delete" || e.key === "0") {
       e.preventDefault(); unplace(S.sel);
     } else if (e.key.startsWith("Arrow")) {
+
       e.preventDefault();
       let nr = r, nc = c;
       if (e.key === "ArrowUp") nr = Math.max(0, r - 1);
@@ -115,6 +130,7 @@ function bindEvents() {
   });
 
   $("#btnNext").onclick = onHint;
+  $("#btnUndo").onclick = undo;
   $("#btnRelease").onclick = () => {
     const i = S.sel;
     if (i < 0 || !S.values[i] || S.given[i] || S.done) return;
@@ -179,6 +195,7 @@ function load(d, resume) {
   S.running = false;
   S.done = resume ? !!resume.done : false;
   clearHi(); guide = -1;
+  clearUndo(); warnedBad = false;
   $("#note").hidden = true;
 
   $("#selW").value = d.W; $("#selH").value = d.H; $("#selL").value = d.level;
@@ -257,9 +274,32 @@ function renderAll() {
   $("#stGrade").textContent = `${S.W}×${S.H} · ${LEVELS[S.level]}`;
   $("#stMode").textContent = S.grade > 1 ? "가정 추론 필요" : "소거 추론만";
   $("#btnRelease").disabled = !(S.sel >= 0 && S.values[S.sel] && !S.given[S.sel] && !S.done);
+  $("#btnUndo").disabled = S.done || !undoStack.length;
+  reportBad(bad.size);
   for (let v = 1; v <= 4; v++) document.querySelector(`[data-left="${v}"]`).textContent = cnt[v];
   document.querySelectorAll(".troop").forEach((b) => b.classList.toggle("on", +b.dataset.v === S.pick));
   renderHintBtn();
+}
+
+/** 규칙을 어긴 칸 수를 상태줄에 띄우고, 열 칸을 넘어서는 순간 한 번 경고한다.
+    붉은 칸이 늘어난 걸 모르고 계속 두는 경우가 많아 눈에 띄게 알려 준다. */
+const BAD_WARN_AT = 10;
+let warnedBad = false;
+
+function reportBad(n) {
+  const tag = $("#stBad");
+  if (tag) {
+    tag.hidden = n === 0;
+    tag.textContent = `규칙 위반 ${n}칸`;
+  }
+  if (n >= BAD_WARN_AT && !warnedBad) {
+    warnedBad = true;
+    toast(`규칙을 어긴 칸이 ${n}개입니다. 되돌리기로 정리해 보세요.`);
+    note(`<b>붉은 칸이 ${n}개입니다.</b> 세 규칙 중 하나를 실제로 어긴 칸들입니다. `
+      + `이대로 두면 이후 추론이 전부 어긋나므로, <b>되돌리기</b>(<code>Ctrl+Z</code>)나 `
+      + `<b>선택한 칸 해제</b>로 먼저 정리하는 편이 빠릅니다.`);
+  }
+  if (n < BAD_WARN_AT) warnedBad = false;   // 정리하면 다시 경고할 수 있게
 }
 
 function renderHintBtn() {
@@ -276,6 +316,8 @@ function renderHintBtn() {
 
 function place(i, v) {
   if (S.given[i] || S.done) return;
+  if (S.values[i] === v) return;
+  snap();
   S.values[i] = v; S.cands[i] = 0;
   if (S.hi.t === i) { clearHi(); guide = -1; }
   renderAll(); save();
@@ -285,6 +327,7 @@ function place(i, v) {
 
 function unplace(i) {
   if (S.given[i] || !S.values[i] || S.done) return;
+  snap();
   S.values[i] = 0; S.cands[i] = 15;
   renderAll(); save();
   emit("progress", snapshot());
@@ -296,11 +339,24 @@ function toggleCand(i, v) {
   if (S.cands[i] & b) {
     // 마지막 하나 남은 후보를 누르면 지우는 대신 그 부대를 확정한다
     if (KP.POP[S.cands[i]] === 1) { place(i, v); return; }
+    snap();
     S.cands[i] &= ~b;
   } else {
+    snap();
     S.cands[i] |= b;
   }
   renderAll(); save();
+}
+
+/** 한 수 되돌린다. 처음부터 주어진 칸은 애초에 바뀌지 않으므로 건드릴 것이 없다. */
+function undo() {
+  if (S.done || !undoStack.length) return;
+  const prev = undoStack.pop();
+  S.values.set(prev.values);
+  S.cands.set(prev.cands);
+  clearHi(); guide = -1;
+  renderAll(); save();
+  emit("progress", snapshot());
 }
 
 function select(i) {
@@ -394,7 +450,10 @@ function onHint() {
 /* ══════════════ 완주 ══════════════ */
 
 function checkWin() {
-  for (let i = 0; i < S.geom.N; i++) if (S.values[i] !== S.solution[i]) return;
+  // 정답지와 한 칸씩 맞춰 보는 대신 '규칙을 지켜 다 찼는가'로 판정한다.
+  // 출제기가 유일해만 내보내므로 둘은 같은 결과를 내지만, 규칙 쪽이 플레이어에게
+  // 알려 준 조건 그대로다 — 혹시라도 해가 둘인 판이 나오면 이쪽이 옳게 인정한다.
+  if (!KP.checkSolution(S.geom, S.values)) return;
   S.done = true;
   stopClock();
   save();
