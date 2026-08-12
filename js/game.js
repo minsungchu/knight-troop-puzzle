@@ -141,7 +141,10 @@ function bindEvents() {
     if (isMatch()) { toast("대전 중에는 새 판을 만들 수 없습니다."); return; }
     newGame(+$("#selW").value, +$("#selH").value, +$("#selL").value);
   };
-  $("#optTilt").oninput = (e) => $("#board").style.setProperty("--tilt", e.target.value + "deg");
+  $("#optTilt").oninput = (e) => setTilt(+e.target.value);
+  setTilt(+$("#optTilt").value);
+  trackLight();
+  makeMotes();
 
   window.addEventListener("resize", () => { if (S.geom) fit(); });
 
@@ -223,6 +226,66 @@ function build() {
   renderAll();
 }
 
+/* ══════════════ 전장 연출 ══════════════ */
+
+/** 기울기를 바꾸면서, 말을 띄울 수 있는 한계도 함께 정한다.
+ *  판을 t도 기울이면 z 만큼 띄운 것이 화면에서 z·sin(t) 만큼 위로 밀려
+ *  윗줄 칸의 아래쪽을 덮는다. 후보 숫자에 닿기 전까지의 여유 안에서만 띄운다. */
+function setTilt(deg) {
+  const root = document.documentElement;
+  $("#board").style.setProperty("--tilt", deg + "deg");
+
+  const cell = parseFloat(getComputedStyle(root).getPropertyValue("--cell")) || 52;
+  const gap = parseFloat(getComputedStyle(root).getPropertyValue("--gap")) || 5;
+  const glyph = cell * 0.26;
+  const slack = gap + (cell / 2 - glyph) / 2 + glyph * 0.15;   // 윗줄 숫자까지의 여백
+  const sin = Math.sin((deg * Math.PI) / 180);
+
+  // 면 높이와 말 높이를 합쳐 여유 안에 들어오게 나눈다.
+  // 여유가 넉넉하면 원래 값(면 26px + 말 10px)을 그대로 쓴다.
+  const allowed = sin < 0.02 ? 999 : slack / sin;
+  const faceZ = Math.max(10, Math.min(26, allowed));
+  const lift = Math.max(0, Math.min(10, allowed - faceZ));
+
+  root.style.setProperty("--placed-z", faceZ.toFixed(1) + "px");
+  root.style.setProperty("--lift", lift.toFixed(1) + "px");
+}
+
+/** 커서를 따라 빛무리를 옮긴다. 요소 하나만 움직이므로 부담이 없다. */
+function trackLight() {
+  const stage = $(".stage"), root = document.documentElement;
+  let queued = false, px = 50, py = 35;
+  stage.addEventListener("pointermove", (e) => {
+    const r = stage.getBoundingClientRect();
+    px = ((e.clientX - r.left) / r.width) * 100;
+    py = ((e.clientY - r.top) / r.height) * 100;
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(() => {
+      queued = false;
+      root.style.setProperty("--lx", px.toFixed(1) + "%");
+      root.style.setProperty("--ly", py.toFixed(1) + "%");
+    });
+  });
+}
+
+/** 떠다니는 먼지. 움직임을 줄여 달라고 한 사용자에게는 만들지 않는다. */
+function makeMotes() {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const box = $("#motes");
+  if (!box || box.childElementCount) return;
+  let html = "";
+  for (let i = 0; i < 16; i++) {
+    const left = (i * 6.4 + (i % 3) * 3) % 100;
+    const top = 30 + ((i * 17) % 62);
+    const dur = 7 + (i % 5) * 2.4;
+    const delay = -(i * 1.7).toFixed(1);
+    html += `<span class="mote" style="left:${left}%;top:${top}%;`
+      + `animation-duration:${dur}s;animation-delay:${delay}s"></span>`;
+  }
+  box.innerHTML = html;
+}
+
 function fit() {
   const narrow = window.innerWidth < 620;
   const pad = narrow ? 36 : 60;               // 받침대(plinth)와 그림자가 넘칠 여백
@@ -232,6 +295,7 @@ function fit() {
   cell = Math.max(24, Math.min(cell, 72));
   document.documentElement.style.setProperty("--cell", cell + "px");
   document.documentElement.style.setProperty("--gap", gap + "px");
+  setTilt(+$("#optTilt").value);          // 칸 크기가 바뀌면 띄울 수 있는 한계도 바뀐다
 }
 
 /* ══════════════ 렌더 ══════════════ */
@@ -321,6 +385,9 @@ function place(i, v) {
   S.values[i] = v; S.cands[i] = 0;
   if (S.hi.t === i) { clearHi(); guide = -1; }
   renderAll(); save();
+  // 방금 놓은 말만 떨어지는 시늉을 한다
+  const t = S.tiles[i];
+  if (t) { t.classList.add("just"); setTimeout(() => t.classList.remove("just"), 360); }
   emit("progress", snapshot());
   checkWin();
 }
