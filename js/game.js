@@ -7,7 +7,7 @@
  */
 import KP from "./engine.js";
 import { $, toast, veil, hideVeil, isVeilOpen, currentTab, onTab, Store, fmt } from "./ui.js";
-import { HINT_MAX, LEVELS, TROOPS, STORE_KEY } from "./config.js";
+import { hintLimit, LEVELS, TROOPS, STORE_KEY } from "./config.js";
 import * as Sfx from "./sound.js";
 
 const bit = (v) => 1 << (v - 1);
@@ -18,7 +18,7 @@ const S = {
   given: null, values: null, cands: null,
   sel: -1, pick: 0, hi: { t: -1, w: [] },
   grade: 2, done: false, tiles: [], busy: false,
-  hints: 0,
+  hints: 0, hintMax: 5,
   ms: 0, runFrom: 0, running: false, tick: null,
   match: null,          // { roomId } — 대전 중일 때만
 };
@@ -204,6 +204,7 @@ function load(d, resume) {
   S.grade = d.grade || d.level;
   S.sel = -1; S.pick = 0;
   S.hints = resume ? (resume.hints || 0) : 0;
+  S.hintMax = hintLimit(S.W, S.H, S.level);
   S.ms = resume ? (resume.ms || 0) : 0;
   S.running = false;
   S.done = resume ? !!resume.done : false;
@@ -379,7 +380,7 @@ function reportBad(n) {
 }
 
 function renderHintBtn() {
-  const b = $("#btnNext"), left = HINT_MAX - S.hints;
+  const b = $("#btnNext"), left = S.hintMax - S.hints;
   b.textContent = `다음 한 수 찾기 · ${left}`;
   b.disabled = left <= 0 || S.done;
   b.classList.toggle("low", left > 0 && left <= 1);
@@ -484,7 +485,7 @@ const clearHi = () => { S.hi = { t: -1, w: [] }; };
 
 function onHint() {
   if (S.done) return;
-  if (S.hints >= HINT_MAX) { toast(`힌트는 한 판에 ${HINT_MAX}번까지입니다.`); return; }
+  if (S.hints >= S.hintMax) { toast(`힌트는 이 판에서 ${S.hintMax}번까지입니다.`); return; }
 
   let wrong = 0;
   for (let i = 0; i < S.geom.N; i++) if (S.values[i] && S.values[i] !== S.solution[i]) wrong++;
@@ -519,7 +520,7 @@ function onHint() {
   // 새 칸을 짚는다 — 여기서만 1회 차감
   S.hints++;
   Sfx.hint();
-  const left = HINT_MAX - S.hints;
+  const left = S.hintMax - S.hints;
   const pick = list[(Math.random() * list.length) | 0];
   guide = pick.i; S.hi = { t: pick.i, w: [] }; S.sel = pick.i;
   renderAll(); save();

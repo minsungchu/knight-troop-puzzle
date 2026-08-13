@@ -17,8 +17,23 @@ export const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 /** 온라인 기능 사용 가능 여부 */
 export const ONLINE = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
 
-/** 한 판에 쓸 수 있는 힌트 횟수 */
-export const HINT_MAX = 5;
+/** 쉬움·보통에서 한 판에 쓸 수 있는 힌트 횟수 */
+export const HINT_BASE = 5;
+
+/** 한 판에 쓸 수 있는 힌트 횟수.
+ *
+ *  어려움만 판 크기에 따라 넉넉하게 준다. 가정 추론이 필요한 난이도라
+ *  판이 커질수록 막히는 지점이 늘어나는데, 다섯 번은 12×12 에서 너무 빠듯하다.
+ *  기준은 칸 수다 — 가로·세로가 다른 판도 크기에 비례해 받는다
+ *  (6×6=36, 8×8=64, 10×10=100, 12×12=144). */
+export function hintLimit(W, H, level) {
+  if (level < 3) return HINT_BASE;
+  const cells = W * H;
+  if (cells <= 36) return 10;
+  if (cells <= 64) return 15;
+  if (cells <= 100) return 20;
+  return 25;
+}
 
 /** 랭킹 보드가 있는 규격 — 정사각 전부.
  *  가로·세로가 다른 판은 순위를 매기지 않는다(기록은 '내 기록'에 남는다). */
