@@ -63,19 +63,32 @@ input[type=range]{accent-color:var(--brass); width:150px}
 .plinth{position:absolute; inset:calc(var(--plinth) * -1); border-radius:12px; transform:translateZ(-14px);
   background:linear-gradient(160deg,#1b2b42,#0d1626 60%); border:1px solid rgba(201,151,63,.3);
   box-shadow:0 36px 64px rgba(0,0,0,.62), inset 0 0 60px rgba(0,0,0,.5)}
-.grid{display:grid; gap:var(--gap); position:relative}
+/* 칸 사이를 grid gap 으로 벌리면 그 띠가 아무에게도 속하지 않는 죽은 영역이 된다.
+   판 넓이의 12%가 그랬고, 지날 때마다 커서가 손↔화살표로 깜빡였다. 그래서 칸은
+   빈틈없이 붙이고, 보이는 타일만 ::before 로 안쪽에 그린다. 이제 판 위 모든 점이
+   어느 칸엔가 속한다.
+   호버로 칸을 움직이지도 않는다 — 커서가 닿는 순간 칸이 2px 물러나면 커서가 다시
+   틈에 빠지고, 그 반복 사이에 누른 클릭은 먹지 않는다. 밝기만 올린다. */
+.grid{display:grid; gap:0; position:relative}
 .cell{
-  width:var(--cell); height:var(--cell); border-radius:6px; position:relative; cursor:pointer;
+  width:var(--cell); height:var(--cell); position:relative; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+.cell::before{
+  content:""; position:absolute; inset:calc(var(--gap) / 2); border-radius:6px;
   background:linear-gradient(150deg,var(--stone-2),var(--stone-1));
   box-shadow:0 1px 0 #1a2637,0 3px 0 #131d29,0 6px 10px rgba(0,0,0,.5);
-  display:flex; align-items:center; justify-content:center; transition:.13s;
+  transition:filter .13s, box-shadow .13s;
 }
-.cell:hover{transform:translateY(-2px)}
-.cell.wall{background:linear-gradient(150deg,#171d27,#0d1117); box-shadow:inset 0 0 14px rgba(0,0,0,.8); cursor:default}
+.cell > *{position:relative; pointer-events:none}   /* 글자가 클릭을 가로채지 않게 */
+.cell:hover::before{filter:brightness(1.35)}
+.cell.wall{cursor:default}
+.cell.wall::before{background:linear-gradient(150deg,#171d27,#0d1117); box-shadow:inset 0 0 14px rgba(0,0,0,.8)}
+.cell.wall:hover::before, .cell.fixed:hover::before{filter:none}
 .cell.fixed{cursor:default}
-.cell.pinned{background:linear-gradient(150deg,#33405a,#1d2738); border:1px solid rgba(223,233,245,.35)}
-.cell.target{background:linear-gradient(150deg,#2a1c2e,#1a1220)}
-.cell.target.lit{background:linear-gradient(150deg,#1c4636,#123024); box-shadow:0 0 22px -2px var(--hit),0 3px 0 #0a1119}
+.cell.pinned::before{background:linear-gradient(150deg,#33405a,#1d2738); box-shadow:0 0 0 1px rgba(223,233,245,.35) inset,0 3px 0 #131d29}
+.cell.target::before{background:linear-gradient(150deg,#2a1c2e,#1a1220)}
+.cell.target.lit::before{background:linear-gradient(150deg,#1c4636,#123024); box-shadow:0 0 22px -2px var(--hit),0 3px 0 #0a1119}
 .mark{font-family:var(--mono); font-size:calc(var(--cell)*.5); line-height:1; user-select:none}
 .mirror{color:#dfe9f5; text-shadow:0 0 10px rgba(255,255,255,.55),0 2px 3px #000}
 .split{color:#b98cf0; text-shadow:0 0 12px rgba(185,140,240,.8)}
@@ -236,7 +249,8 @@ function fit() {
   const gap = narrow ? 3 : 4;
   const plinth = narrow ? 10 : 20;
   // 받침대 테두리 1px 과 반올림 오차 때문에 2px 을 더 비워 둔다
-  const cell = Math.max(20, Math.min(56, Math.floor((room - plinth * 2 - gap * (W - 1) - 2) / W)));
+  // 간격은 칸 안쪽에 있으므로 따로 빼지 않는다. 받침대 테두리 몫 2px 만 비운다.
+  const cell = Math.max(20, Math.min(56, Math.floor((room - plinth * 2 - 2) / W)));
   const root = document.documentElement.style;
   root.setProperty("--cell", cell + "px");
   root.setProperty("--gap", gap + "px");
@@ -291,7 +305,8 @@ function cssPx(name) {
 function cellSize() { return cssPx("--cell"); }
 
 function render() {
-  const b = P.board, cs = cellSize(), gap = cssPx("--gap"), step = cs + gap;
+  // 간격이 칸 안쪽으로 들어갔으므로 칸 간 거리는 칸 크기 그대로다
+  const b = P.board, cs = cellSize(), step = cs;
   const r = trace(b, placed);
 
   // 거울과 목표 상태
@@ -384,7 +399,9 @@ function advance() {
 }
 
 $("#grid") && null;
-document.addEventListener("click", (e) => {
+/* click 은 누른 곳과 뗀 곳이 같은 요소여야 발생한다. 칸이 작고 촘촘해서
+   조금만 밀려도 그냥 무시됐다. 누르는 순간 처리한다. */
+document.addEventListener("pointerdown", (e) => {
   const el = e.target.closest(".cell");
   if (!el || !P) return;
   const x = +el.dataset.x, y = +el.dataset.y;
