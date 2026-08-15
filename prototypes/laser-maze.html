@@ -9,13 +9,15 @@
   --void:#080d16; --deep:#0e1726; --stone-1:#23344b; --stone-2:#2d4159;
   --brass:#c9973f; --parch:#ece2cb; --mist:#93a7c0;
   --beam:#ffd98a; --hit:#6fe3b0; --miss:#e0576d;
-  --cell:56px;
+  --cell:56px; --gap:4px; --plinth:20px;
   --display:"Gowun Batang","Nanum Myeongjo",Georgia,serif;
   --body:"Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
   --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
 }
 *{box-sizing:border-box}
-html,body{margin:0;padding:0}
+/* 빛줄기는 판 밖으로 몇 px 삐져나간다(빗나간 빛을 보여 줘야 하니 일부러 그렇다).
+   그것 때문에 가로 스크롤이 생기지는 않게 잘라 둔다. */
+html,body{margin:0;padding:0;overflow-x:clip}
 body{
   min-height:100vh; background:
     radial-gradient(1100px 700px at 50% -12%, #1c2c46 0%, transparent 62%),
@@ -24,6 +26,10 @@ body{
   color:var(--parch); font-family:var(--body);
 }
 .wrap{max-width:1080px; margin:0 auto; padding:22px 16px 80px}
+@media (max-width:560px){
+  .wrap{padding:16px 10px 60px}
+  h1{font-size:20px}
+}
 h1{font-family:var(--display); font-size:24px; margin:0}
 .sub{font-size:12px; color:var(--mist); letter-spacing:.14em; margin-top:5px}
 .warn{margin-top:14px; padding:11px 15px; border-radius:8px; font-size:12.5px; line-height:1.7;
@@ -48,10 +54,10 @@ input[type=range]{accent-color:var(--brass); width:150px}
 
 .stage{display:flex; justify-content:center; padding:26px 0 8px; perspective:1400px}
 .board{position:relative; transform:rotateX(14deg); transform-style:preserve-3d}
-.plinth{position:absolute; inset:-20px; border-radius:12px; transform:translateZ(-14px);
+.plinth{position:absolute; inset:calc(var(--plinth) * -1); border-radius:12px; transform:translateZ(-14px);
   background:linear-gradient(160deg,#1b2b42,#0d1626 60%); border:1px solid rgba(201,151,63,.3);
   box-shadow:0 36px 64px rgba(0,0,0,.62), inset 0 0 60px rgba(0,0,0,.5)}
-.grid{display:grid; gap:4px; position:relative}
+.grid{display:grid; gap:var(--gap); position:relative}
 .cell{
   width:var(--cell); height:var(--cell); border-radius:6px; position:relative; cursor:pointer;
   background:linear-gradient(150deg,var(--stone-2),var(--stone-1));
@@ -66,7 +72,8 @@ input[type=range]{accent-color:var(--brass); width:150px}
 .mark{font-family:var(--mono); font-size:calc(var(--cell)*.5); line-height:1; user-select:none}
 .mirror{color:#dfe9f5; text-shadow:0 0 10px rgba(255,255,255,.55),0 2px 3px #000}
 .split{color:#b98cf0; text-shadow:0 0 12px rgba(185,140,240,.8)}
-.tshape{width:calc(var(--cell)*.42); height:calc(var(--cell)*.42); border:3px solid var(--miss)}
+.tshape{width:calc(var(--cell)*.42); height:calc(var(--cell)*.42);
+  border:max(2px, calc(var(--cell)*.055)) solid var(--miss)}
 .tshape.c0{border-radius:50%}
 .tshape.c1{border-radius:3px; transform:rotate(45deg)}
 .cell.target.lit .tshape{border-color:var(--hit); box-shadow:0 0 16px var(--hit)}
@@ -75,9 +82,11 @@ input[type=range]{accent-color:var(--brass); width:150px}
 svg.beam{position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible}
 /* 발광은 선을 겹쳐서 낸다. SVG 필터를 쓰면 수직·수평선의 바운딩 박스가 납작해
    objectBoundingBox 기준 필터 영역이 사라지고 아무것도 안 그려진다. */
-.beam-halo{stroke:var(--beam); stroke-width:14; stroke-linecap:round; opacity:.10}
-.beam-mid{stroke:var(--beam); stroke-width:7; stroke-linecap:round; opacity:.22}
-.beam-core{stroke:#fff6df; stroke-width:2.6; stroke-linecap:round; opacity:.95}
+   굵기는 칸 크기에 비례해야 한다 — 좁은 화면에서 칸이 절반이 되면
+   고정 굵기 광선이 칸을 통째로 덮어 버린다. */
+.beam-halo{stroke:var(--beam); stroke-width:calc(var(--cell)*.25); stroke-linecap:round; opacity:.10}
+.beam-mid{stroke:var(--beam); stroke-width:calc(var(--cell)*.125); stroke-linecap:round; opacity:.22}
+.beam-core{stroke:#fff6df; stroke-width:calc(var(--cell)*.047); stroke-linecap:round; opacity:.95}
 
 .panel{margin-top:22px; border:1px solid rgba(201,151,63,.24); border-radius:10px; background:rgba(13,22,36,.6); padding:16px 18px}
 .panel h2{font-family:var(--display); font-size:15px; margin:0 0 10px; color:var(--brass)}
@@ -183,9 +192,47 @@ function load(p) {
   build();
 }
 
+/** 판을 화면 폭에 맞춘다.
+ *
+ *  칸 크기를 48/56px 로 못박으면 9칸짜리 판이 폰 화면을 넘어가 오른쪽이 잘린다.
+ *  쓸 수 있는 폭에서 받침대가 삐져나온 만큼과 칸 사이 간격을 뺀 나머지를
+ *  칸 수로 나눠 정한다. 광선 굵기·목표 테두리·글자는 모두 --cell 에 비례하므로
+ *  여기만 바꾸면 나머지는 따라온다. */
+function fit() {
+  if (!P) return;
+  const W = P.board.W;
+  const room = $(".stage").clientWidth;
+  const narrow = room < 420;
+  const gap = narrow ? 3 : 4;
+  const plinth = narrow ? 10 : 20;
+  // 받침대 테두리 1px 과 반올림 오차 때문에 2px 을 더 비워 둔다
+  const cell = Math.max(20, Math.min(56, Math.floor((room - plinth * 2 - gap * (W - 1) - 2) / W)));
+  const root = document.documentElement.style;
+  root.setProperty("--cell", cell + "px");
+  root.setProperty("--gap", gap + "px");
+  root.setProperty("--plinth", plinth + "px");
+}
+
+/* 폭 변화는 window resize 가 아니라 무대 자체를 지켜본다. 화면 회전이나
+   글꼴 로딩, 스크롤바 등장처럼 창 크기는 그대로인데 쓸 수 있는 폭만 바뀌는
+   경우가 있고, 그때도 판은 다시 맞춰져야 한다.
+   fit() 은 무대 폭을 바꾸지 않으니(판은 절대 배치된 받침대와 격자뿐) 되먹임은 없다. */
+let lastRoom = 0;
+/* 관찰자는 변수에 붙들어 둬야 한다. new ResizeObserver(...).observe(...) 로 쓰면
+   observe() 가 undefined 를 돌려주고 관찰자를 가리키는 참조가 남지 않아,
+   콜백이 한 번 돌기도 전에 수거된다. */
+const fitWatch = new ResizeObserver(() => {
+  const room = Math.round($(".stage").clientWidth);
+  if (!P || room === lastRoom) return;
+  lastRoom = room;
+  fit();
+  render();
+});
+fitWatch.observe($(".stage"));
+
 function build() {
   const b = P.board;
-  document.documentElement.style.setProperty("--cell", (b.W > 7 ? 48 : 56) + "px");
+  fit();
   const board = $("#board");
   board.innerHTML = `<div class="plinth"></div><div class="grid" id="grid"></div>`;
   const g = $("#grid");
@@ -205,12 +252,13 @@ function build() {
   render();
 }
 
-function cellSize() {
-  return parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--cell"));
+function cssPx(name) {
+  return parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name));
 }
+function cellSize() { return cssPx("--cell"); }
 
 function render() {
-  const b = P.board, cs = cellSize(), gap = 4, step = cs + gap;
+  const b = P.board, cs = cellSize(), gap = cssPx("--gap"), step = cs + gap;
   const r = trace(b, placed);
 
   // 거울과 목표 상태
@@ -231,9 +279,9 @@ function render() {
 
   // 광원 표시
   const s = b.src, arrow = ["▶","▼","◀","▲"][s.dir];
-  const sx = cx(s.x), sy = cx(s.y);
+  const sx = cx(s.x), sy = cx(s.y), fs = Math.max(11, cs * 0.36);
   svg.insertAdjacentHTML("beforeend",
-    `<text x="${sx}" y="${sy + 7}" text-anchor="middle" fill="#c9973f" font-size="20"
+    `<text x="${sx}" y="${sy + fs * 0.35}" text-anchor="middle" fill="#c9973f" font-size="${fs}"
        style="filter:drop-shadow(0 0 8px #c9973f)">${arrow}</text>`);
 
   const need = targetsOf(b);
