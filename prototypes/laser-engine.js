@@ -127,7 +127,9 @@ export function solve(b, mirrorBudget, opts = {}) {
   const targets = targetsOf(b);
   const need = targets.length;
 
+  const collect = !!opts.collect;          // 해를 실제로 모을지 — 조이기에 쓴다
   let nodes = 0, solutions = 0, first = null, aborted = false;
+  const list = [];
 
   /* decided: 칸 → "/" | "\\" | "." (비우기로 확정)
      fronts: 아직 진행해야 할 빛 갈래 */
@@ -138,7 +140,9 @@ export function solve(b, mirrorBudget, opts = {}) {
     if (!fronts.length) {
       if (left === 0 && hits.size === need) {
         solutions++;
-        if (!first) first = new Map([...decided].filter(([, v]) => v !== "."));
+        const m = new Map([...decided].filter(([, v]) => v !== "."));
+        if (!first) first = m;
+        if (collect) list.push(m);
       }
       return;
     }
@@ -195,7 +199,7 @@ export function solve(b, mirrorBudget, opts = {}) {
   }
 
   walk([{ x: b.src.x, y: b.src.y, dir: b.src.dir, seen: new Set() }], new Map(), mirrorBudget, new Set());
-  return { solutions, nodes, first, aborted };
+  return { solutions, nodes, first, aborted, list };
 }
 
 /* ══════════════ 난이도 점수 ══════════════
@@ -222,7 +226,9 @@ export function difficulty({ nodes, solutions, mirrors }) {
    앞에서 뒤로 만든다 — 빛을 실제로 쏘면서 거울을 놓아 경로를 만들고,
    빛이 멎는 자리에 목표를 세운다. 그 뒤 거울을 걷어 내면 그게 문제가 된다. */
 
+export let lastFail = "";
 export function generate(spec, seed) {
+  lastFail = "";
   const { W, H, mirrors, walls = 0, splitters = 0, targets = 1 } = spec;
   const rnd = rng(seed);
   const b = makeBoard(W, H);
@@ -281,15 +287,30 @@ export function generate(spec, seed) {
       if (toPlace > 0) {
         const nx = x + DX[dir], ny = y + DY[dir];
         const dying = !inside(b, nx, ny) || at(b, nx, ny) === WALL;
+
+        /** 그 방향으로 벽이나 판 끝에 닿기까지 몇 칸이 남았나 */
+        const room = (d) => {
+          let n = 0, cx2 = x, cy2 = y;
+          for (;;) {
+            cx2 += DX[d]; cy2 += DY[d];
+            if (!inside(b, cx2, cy2) || at(b, cx2, cy2) === WALL) return n;
+            n++;
+          }
+        };
+
         const turns = [MIRROR_SLASH, MIRROR_BACK]
           .map((m) => ({ m, d: m === MIRROR_SLASH ? REFLECT_SLASH(dir) : REFLECT_BACK(dir) }))
-          .filter(({ d }) => {
-            const tx = x + DX[d], ty = y + DY[d];
-            return inside(b, tx, ty) && at(b, tx, ty) !== WALL;   // 꺾어도 살아 있어야 의미가 있다
-          });
+          .map((t) => ({ ...t, room: room(t.d) }))
+          .filter((t) => t.room > 0)                    // 꺾어도 살아 있어야 의미가 있다
+          .sort((a, c) => c.room - a.room);             // 넓은 쪽을 앞에 둔다
 
-        if (turns.length && (dying || rnd() < 0.34)) {
-          const pick = turns[(rnd() * turns.length) | 0];
+        /* 확률을 0.34 로 고정하면 남은 거울이 많을 때 빛이 먼저 판을 빠져나간다.
+           7×7 에 거울 7개를 놓으려 하면 열에 아홉이 실패했다. 남은 거울이 많을수록
+           자주 꺾고, 꺾을 때는 남은 길이 긴 쪽을 고른다. */
+        const urgency = Math.min(0.9, 0.22 + toPlace * 0.11);
+
+        if (turns.length && (dying || rnd() < urgency)) {
+          const pick = turns.length > 1 && rnd() < 0.3 ? turns[1] : turns[0];
           placed.set(`${x},${y}`, pick.m);
           toPlace--;
           dir = pick.d;
@@ -298,38 +319,191 @@ export function generate(spec, seed) {
     }
   }
 
-  if (toPlace > 0) return null;                 // 거울을 다 못 놓았다 — 버린다
+  if (toPlace > 0) { lastFail = `거울 ${toPlace}개 못 놓음`; return null; }
 
   /* 목표는 '다 놓은 뒤 다시 쏜' 경로를 기준으로 세운다.
      걷는 동안 모은 끝점을 쓰면 안 된다 — 분광기로 갈라진 앞 가지가 지나간 빈 칸에
      뒤 가지가 거울을 놓으면 앞 가지의 경로가 달라지기 때문이다. */
   const finalRun = trace(b, placed);
   const spots = finalRun.ends.filter(({ x, y }) => inside(b, x, y) && at(b, x, y) === EMPTY && !placed.has(`${x},${y}`));
-  if (spots.length < targets) return null;
-  for (let i = 0; i < targets; i++) set(b, spots[i].x, spots[i].y, TARGET);
+  /* 목표는 한 곳만 세워도 된다. 나머지는 조이기가 빛길 위에 얹는다 —
+     빛이 멎는 자리는 분광기 수에 묶여 있어, 여기서 여러 개를 요구하면
+     절반 넘는 씨앗이 그것 하나로 버려진다. */
+  if (spots.length < 1) { lastFail = "빛이 멎는 자리가 없음"; return null; }
+  const nt = Math.min(targets, spots.length);
+  for (let i = 0; i < nt; i++) set(b, spots[i].x, spots[i].y, TARGET);
 
   b.mirrors = mirrors;
   return { board: b, answer: placed };
 }
 
+/* ══════════════ 조이기 ══════════════
+   생성기가 뱉는 판은 답이 수백~수천 개다. 넓은 빈 판에서는 빛을 목표까지 보내는 길이
+   여러 개라서 그렇다. 답이 여러 개면 아무렇게나 놓아도 맞으니 푸는 맛이 없고,
+   "거울을 다 써야 한다"는 규칙도 억지로 느껴진다.
+
+   그래서 만든 뒤에 조인다. 정답 하나를 쥐고 있으니, 정답은 살리면서 다른 답만
+   죽이는 제약을 하나씩 얹으면 된다. 얹을 수 있는 건 둘이다.
+
+     · 정답의 빛이 지나가는 칸에 목표를 세운다. 빛은 목표를 통과하므로 정답은
+       그대로 성립하고, 그 칸을 지나지 않는 다른 답은 전부 죽는다.
+     · 정답의 빛이 지나가지 않는 칸에 벽을 세운다. 정답은 건드리지 않고,
+       그 칸을 쓰던 다른 답만 죽는다.
+
+   매번 가장 많이 죽이는 것을 고른다. 목표를 먼저 쓴다 — 벽은 판을 어둡게 만들고
+   목표는 오히려 퍼즐을 재미있게 한다. */
+function pathCells(b, placed) {
+  const r = trace(b, placed);
+  const cells = new Set();
+  for (const { x, y } of r.path) cells.add(`${x},${y}`);
+  return { cells, hits: r.hits };
+}
+
+function sameMap(a, c) {
+  if (a.size !== c.size) return false;
+  for (const [k, v] of a) if (c.get(k) !== v) return false;
+  return true;
+}
+
+/** 정답의 거울 배치를 solve() 가 쓰는 표기("/", "\\")로 바꾼다. */
+function asDecided(answer) {
+  const m = new Map();
+  for (const [k, v] of answer) m.set(k, v === MIRROR_SLASH ? "/" : "\\");
+  return m;
+}
+
+export function tighten(b, answer, mirrors, opts = {}) {
+  const maxTargets = opts.maxTargets ?? 5;
+  const maxSteps = opts.maxSteps ?? 16;
+  const sample = opts.sampleSolutions ?? 40;
+  const minMirrors = opts.minMirrors ?? 2;   // 플레이어가 놓을 거울의 하한
+  const nodeLimit = opts.nodeLimit || 400000;
+
+  const answerLeft = new Map(answer);   // 아직 플레이어가 놓아야 할 거울
+  let budget = mirrors;
+
+  for (let step = 0; step < maxSteps; step++) {
+    const want = asDecided(answerLeft);
+    const r = solve(b, budget, { collect: true, maxSolutions: sample, nodeLimit });
+    if (r.aborted) return { ok: false, why: "solver-aborted" };
+    if (r.solutions === 0) return { ok: false, why: "answer-lost" };
+
+    const alts = r.list.filter((m) => !sameMap(m, want));
+    if (r.solutions > 1 && !alts.length) return { ok: false, why: "answer-missing" };
+
+    /* 거울을 덜 쓰고도 목표를 다 켜지는 판이 있다. 답이 하나여도 그렇다.
+       그러면 목표를 다 켜 놓고도 "거울을 더 놓으라"는 말을 듣게 돼서,
+       규칙이 억지로 느껴진다. 그런 지름길도 대안으로 보고 같이 죽인다. */
+    for (let k = budget - 1; k >= 1 && alts.length < sample; k--) {
+      const sh = solve(b, k, { collect: true, maxSolutions: 8, nodeLimit });
+      if (sh.aborted) break;
+      alts.push(...sh.list);
+    }
+
+    if (!alts.length) return { ok: true, steps: step, mirrors: budget };
+
+    const altPaths = alts.map((m) => {
+      const asMirrors = new Map();
+      for (const [k, v] of m) asMirrors.set(k, v === "/" ? MIRROR_SLASH : MIRROR_BACK);
+      return { mirrors: m, cells: pathCells(b, asMirrors).cells };
+    });
+
+    const mine = pathCells(b, answerLeft).cells;
+    const stillMine = new Set(answerLeft.keys());
+    const targetCount = targetsOf(b).length;
+
+    let best = null;
+    const consider = (cand) => {
+      if (cand.kills <= 0) return;
+      // 목표 > 붙박이 거울 > 벽 순으로 선호한다. 벽은 판을 어둡게만 만든다.
+      const pref = cand.kind === "target" ? 6 : cand.kind === "freeze" ? 3 : 0;
+      const rankScore = cand.kills * 10 + pref;
+      if (!best || rankScore > best.rankScore) best = { ...cand, rankScore };
+    };
+
+    for (let y = 0; y < b.H; y++) for (let x = 0; x < b.W; x++) {
+      const key = `${x},${y}`;
+      if (at(b, x, y) !== EMPTY || stillMine.has(key)) continue;
+      if (mine.has(key)) {
+        if (targetCount < maxTargets)
+          consider({ kind: "target", x, y, kills: altPaths.filter((a) => !a.cells.has(key)).length });
+      } else {
+        consider({ kind: "wall", x, y, kills: altPaths.filter((a) => a.cells.has(key) || a.mirrors.has(key)).length });
+      }
+    }
+
+    /* 벽과 목표만으로는 죽지 않는 대안이 남는다 — 정답과 똑같은 칸을 지나면서
+       거울 방향만 다른 것들이다. 그때는 정답의 거울 하나를 판에 붙박이로 박는다.
+       그 거울을 그 방향으로 쓰지 않는 대안은 전부 죽고, 플레이어가 놓을 거울은
+       하나 줄어든다. 원래 Laser Maze 에도 처음부터 박혀 있는 거울이 있다. */
+    /* 붙박이는 대안을 무더기로 죽이므로 그냥 두면 이것만 고른다. 그러면 거울 7개짜리
+       판이 "박힌 5개 + 놓을 2개" 가 돼서 쉬워진다. 하한 아래로는 못 박게 막는다. */
+    if (budget > minMirrors) {
+      for (const [key, m] of answerLeft) {
+        const [fx, fy] = key.split(",").map(Number);
+        const kills = alts.filter((a) => a.get(key) !== m).length;
+        consider({ kind: "freeze", x: fx, y: fy, key, mirror: m, kills });
+      }
+    }
+
+    if (!best) return { ok: false, why: "no-constraint-left" };
+
+    if (best.kind === "freeze") {
+      set(b, best.x, best.y, best.mirror === MIRROR_SLASH ? FIXED_SLASH : FIXED_BACK);
+      answerLeft.delete(best.key);
+      budget--;
+    } else {
+      set(b, best.x, best.y, best.kind === "target" ? TARGET : WALL);
+    }
+
+    // 얹고 나서 정답이 여전히 성립하는지 확인한다
+    const chk = trace(b, answerLeft);
+    if (!targetsOf(b).every((t) => chk.hits.has(t))) return { ok: false, why: "answer-broken" };
+  }
+  return { ok: false, why: "too-many-steps" };
+}
+
 /** 문제 하나를 만들고 풀어 난이도까지 매긴다. 못 만들면 null. */
 export function makePuzzle(spec, seed, opts = {}) {
-  const g = generate(spec, seed);
+  /* 조이다 보면 거울 몇 개가 판에 박힌다. 그만큼 여유를 두고 만들어야
+     플레이어가 놓을 개수가 원하는 값으로 남는다. */
+  const slack = spec.fixed ?? 2;
+  const g = generate({ ...spec, mirrors: spec.mirrors + slack }, seed);
   if (!g) return null;
   // 생성기가 들고 있는 답이 실제로 통하는지 먼저 확인한다
   const check = trace(g.board, g.answer);
-  const need = targetsOf(g.board);
-  if (g.answer.size !== spec.mirrors || !need.every((t) => check.hits.has(t))) return null;
+  if (g.answer.size !== spec.mirrors + slack || !targetsOf(g.board).every((t) => check.hits.has(t))) return null;
 
-  const r = solve(g.board, spec.mirrors, opts);
+  /* 답이 하나가 될 때까지 조인다. 조이면서 거울 몇 개가 판에 박힐 수 있으므로,
+     플레이어가 놓을 개수는 조이기가 알려 주는 값을 쓴다. */
+  const answer = new Map(g.answer);
+  let mirrors = spec.mirrors + slack;
+  if (opts.unique !== false) {
+    const t = tighten(g.board, answer, spec.mirrors + slack, { ...opts, minMirrors: spec.mirrors });
+    if (!t.ok) return null;
+    mirrors = t.mirrors;
+    for (const k of [...answer.keys()]) if (at(g.board, ...k.split(",").map(Number)) !== EMPTY) answer.delete(k);
+    if (answer.size !== mirrors) return null;
+  }
+
+  const r = solve(g.board, mirrors, opts);
   if (r.aborted || r.solutions === 0) return null;
+  if (opts.unique !== false) {
+    if (r.solutions !== 1) return null;
+    // 거울을 덜 쓰는 지름길이 남아 있으면 버린다
+    for (let k = 1; k < mirrors; k++) {
+      if (solve(g.board, k, { maxSolutions: 1 }).solutions > 0) return null;
+    }
+  }
   return {
     board: g.board,
-    answer: g.answer,
-    spec,
+    answer,
+    spec: { ...spec, mirrors },
     seed,
     solutions: r.solutions,
     nodes: r.nodes,
-    score: difficulty({ nodes: r.nodes, solutions: r.solutions, mirrors: spec.mirrors }),
+    targets: targetsOf(g.board).length,
+    fixed: spec.mirrors + slack - mirrors,   // 판에 박힌 거울 수
+    score: difficulty({ nodes: r.nodes, solutions: r.solutions, mirrors }),
   };
 }

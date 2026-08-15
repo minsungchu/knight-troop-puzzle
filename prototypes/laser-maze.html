@@ -73,6 +73,7 @@ input[type=range]{accent-color:var(--brass); width:150px}
 .cell:hover{transform:translateY(-2px)}
 .cell.wall{background:linear-gradient(150deg,#171d27,#0d1117); box-shadow:inset 0 0 14px rgba(0,0,0,.8); cursor:default}
 .cell.fixed{cursor:default}
+.cell.pinned{background:linear-gradient(150deg,#33405a,#1d2738); border:1px solid rgba(223,233,245,.35)}
 .cell.target{background:linear-gradient(150deg,#2a1c2e,#1a1220)}
 .cell.target.lit{background:linear-gradient(150deg,#1c4636,#123024); box-shadow:0 0 22px -2px var(--hit),0 3px 0 #0a1119}
 .mark{font-family:var(--mono); font-size:calc(var(--cell)*.5); line-height:1; user-select:none}
@@ -162,6 +163,7 @@ td.num{font-family:var(--mono); text-align:right; font-variant-numeric:tabular-n
       <b>거울</b>은 빈 칸을 눌러 <b>／</b> → <b>＼</b> → 없음 순서로 바꿉니다. 벽·목표·분광기 칸에는 못 놓습니다.<br>
       <b>성공 조건은 둘 다</b>입니다 — 주어진 거울을 <b>하나도 남기지 않고</b> 놓고,
       <b>모든 목표</b>에 빛이 닿아야 합니다. 하나만 채워서는 안 됩니다.<br>
+      <b>테두리가 밝은 흰 거울</b>은 <b>붙박이</b>라 옮길 수 없습니다 — 세는 개수에 들어가지 않습니다.<br>
       <b>분광기</b>(보라색 ／＼)는 판에 붙박이로, 빛을 <b>둘로 가릅니다</b> — 직진분과 반사분이 함께 갑니다.
       목표가 둘일 때는 대개 이걸 써야 둘 다 닿습니다.<br>
       <b>벽</b>(검은 칸)은 빛을 삼킵니다. 판 밖으로 나간 빛도 사라집니다.<br>
@@ -172,19 +174,27 @@ td.num{font-family:var(--mono); text-align:right; font-variant-numeric:tabular-n
 
 <script type="module">
 import { makePuzzle, trace, targetsOf, at, inside,
-         EMPTY, WALL, TARGET, SPLIT_SLASH, SPLIT_BACK,
+         EMPTY, WALL, TARGET, SPLIT_SLASH, SPLIT_BACK, FIXED_SLASH, FIXED_BACK,
          MIRROR_SLASH, MIRROR_BACK, DX, DY } from "./laser-engine.js";
 
 const $ = (s) => document.querySelector(s);
 
-/* 난이도 슬라이더(0~100) → 생성 규격. 21~100단계 구간을 그대로 흉내낸다. */
+/* 난이도 슬라이더(0~100) → 생성 규격. 21~100단계 구간을 그대로 흉내낸다.
+   mirrors 는 '플레이어가 놓을 개수'다. 조이는 과정에서 몇 개가 판에 박힐 수 있어
+   fixed 만큼 여유를 두고 만든 뒤, 남는 개수가 mirrors 가 되게 맞춘다. */
+const LADDER = [
+  { W:5,H:5, mirrors:2, walls:1, splitters:0, targets:1 },
+  { W:5,H:5, mirrors:3, walls:1, splitters:0, targets:1 },
+  { W:6,H:6, mirrors:3, walls:3, splitters:0, targets:2 },
+  { W:6,H:6, mirrors:4, walls:3, splitters:1, targets:2 },
+  { W:7,H:7, mirrors:4, walls:4, splitters:1, targets:2 },
+  { W:7,H:7, mirrors:5, walls:5, splitters:1, targets:2 },
+  { W:7,H:7, mirrors:6, walls:5, splitters:1, targets:2 },
+  { W:8,H:8, mirrors:7, walls:7, splitters:2, targets:2 },
+];
 function specFor(level) {
-  const t = level / 100;
-  if (t < 0.18) return { W:5,H:5, mirrors:2+Math.round(t*6), walls:1, splitters:0, targets:1 };
-  if (t < 0.40) return { W:6,H:6, mirrors:3+Math.round((t-0.18)*9), walls:3, splitters:0, targets:1 };
-  if (t < 0.62) return { W:7,H:7, mirrors:4+Math.round((t-0.40)*9), walls:4, splitters:1, targets:1 };
-  if (t < 0.82) return { W:7,H:7, mirrors:5+Math.round((t-0.62)*10), walls:5, splitters:1, targets:2 };
-  return { W:8,H:8, mirrors:7+Math.round((t-0.82)*11), walls:7, splitters:2, targets:2 };
+  const i = Math.min(LADDER.length - 1, Math.floor(level / 100 * LADDER.length));
+  return { ...LADDER[i], fixed: 2 };
 }
 
 let P = null;              // 현재 문제
@@ -266,6 +276,9 @@ function build() {
     else if (c === TARGET) { cls += " target"; inner = `<div class="tshape c${(y * b.W + x) % 2}"></div>`; }
     else if (c === SPLIT_SLASH) { cls += " fixed"; inner = `<span class="mark split">／</span>`; }
     else if (c === SPLIT_BACK) { cls += " fixed"; inner = `<span class="mark split">＼</span>`; }
+    // 붙박이 거울 — 처음부터 박혀 있어 옮길 수 없다. 분광기(보라)와 구별되게 그린다.
+    else if (c === FIXED_SLASH) { cls += " fixed pinned"; inner = `<span class="mark mirror">／</span>`; }
+    else if (c === FIXED_BACK) { cls += " fixed pinned"; inner = `<span class="mark mirror">＼</span>`; }
     html += `<div class="${cls}" data-x="${x}" data-y="${y}">${inner}</div>`;
   }
   g.innerHTML = html + `<div class="emitter" id="emitter"></div><svg class="beam" id="beam"></svg>`;
