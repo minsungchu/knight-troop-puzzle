@@ -346,11 +346,14 @@ function onWin() {
   const secs = (performance.now() - t0) / 1000;
 
   if (test) {
-    test.times.push({ p: test.set[test.i], secs });   // 기록은 바로 남긴다 — 시간은 여기서 끝났다
+    const cur = test.set[test.i];
+    // 기록은 바로 남긴다 — 시간은 여기서 끝났다. 몇 번째로 푼 판인지도 같이 남긴다.
+    if (!cur.warmup) test.times.push({ p: cur, secs, order: test.i });
     const last = test.i === test.set.length - 1;
-    say(`<b>${test.i + 1} / ${test.set.length} 완성</b> — ${secs.toFixed(1)}초.
-      완성된 빛줄기를 확인하고 넘어가세요.
-      <button id="btnNext" style="margin-left:10px">${last ? "결과 보기" : "다음 판"}</button>`, true, true);
+    const label = cur.warmup ? "연습판 완성" : `${test.i} / ${test.set.length - 1} 완성`;
+    say(`<b>${label}</b> — ${secs.toFixed(1)}초.
+      ${cur.warmup ? "연습판은 기록에 넣지 않습니다. 이제 본 테스트입니다." : "완성된 빛줄기를 확인하고 넘어가세요."}
+      <button id="btnNext" style="margin-left:10px">${last ? "결과 보기" : cur.warmup ? "시작" : "다음 판"}</button>`, true, true);
   } else {
     say(`<b>성공!</b> ${secs.toFixed(1)}초 · 난이도 ${P.score}
       <button id="btnNext" style="margin-left:10px">다음 문제</button>`, true, true);
@@ -395,11 +398,16 @@ $("#btnClear").onclick = () => { placed = new Map(); render(); };
    다 풀면 '푸는 데 걸린 시간 순서'와 '점수 순서'를 나란히 놓고 비교한다.
    둘의 순위 상관이 높으면 점수가 체감을 반영한다는 뜻이다. */
 function startTest() {
-  const levels = [10, 22, 34, 46, 58, 70, 82, 94];
+  const levels = [6, 14, 22, 30, 40, 50, 60, 70, 80, 90];
   const set = [];
   for (const L of levels) { const p = newPuzzle(L); if (p) set.push(p); }
   if (set.length < 5) { say("문제를 충분히 만들지 못했습니다."); return; }
   for (let i = set.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [set[i], set[j]] = [set[j], set[i]]; }
+  /* 맨 앞에 연습판을 붙인다. 지난 회차에서 가장 쉬운 판이 시간 4위였는데,
+     순서를 안 남겨 둬서 그게 처음 푼 판이라 그런지 확인할 수가 없었다.
+     이번에는 규칙 익히는 값을 연습판이 받아 내고, 순서도 기록한다. */
+  const warm = newPuzzle(4);
+  if (warm) set.unshift(Object.assign(warm, { warmup: true }));
   test = { set, i: 0, times: [] };
   $("#results").hidden = true;
   $("#btnTest").textContent = "테스트 진행 중…";
@@ -421,11 +429,14 @@ function showResults() {
 
   $("#resBody").innerHTML = `
     <table>
-      <thead><tr><th>점수 순위</th><th>난이도 점수</th><th>규격</th><th>걸린 시간</th><th>시간 순위</th></tr></thead>
+      <thead><tr><th>점수 순위</th><th>점수</th><th>규격</th><th>노드</th><th>해</th><th>몇째로 품</th><th>걸린 시간</th><th>시간 순위</th></tr></thead>
       <tbody>${byScore.map((r) => `<tr>
         <td class="num">${rank(byScore, r)}</td>
         <td class="num">${r.p.score}</td>
         <td>${r.p.spec.W}×${r.p.spec.H} 거울 ${r.p.spec.mirrors}</td>
+        <td class="num">${r.p.nodes}</td>
+        <td class="num">${r.p.solutions}</td>
+        <td class="num">${r.order}</td>
         <td class="num">${r.secs.toFixed(1)}초</td>
         <td class="num ${rank(byTime, r) === rank(byScore, r) ? "good" : ""}">${rank(byTime, r)}</td>
       </tr>`).join("")}</tbody>
@@ -438,8 +449,10 @@ function showResults() {
       <br>한 판만 유난히 오래 걸렸다면 그 판이 이상한 것일 수 있으니, 한 번 더 돌려 보시는 편이 좋습니다.
     </div>`;
   // 결과가 새로고침으로 날아가면 다시 풀어야 한다. 남겨 두고, 한 줄 요약도 붙인다.
-  const line = `ρ=${rho.toFixed(2)} | ` +
-    byScore.map((r) => `${r.p.score}:${r.secs.toFixed(1)}s`).join(" ");
+  // 지난번엔 점수와 시간만 남겨서, 노드 수를 점수에서 거꾸로 풀어내야 했다.
+  // 원자료(노드·해·거울·판크기·푼 순서)를 다 적어 두면 가중치를 다시 맞출 수 있다.
+  const line = `rho=${rho.toFixed(3)} | ` + byScore.map((r) =>
+    `${r.p.spec.W}x${r.p.spec.H}m${r.p.spec.mirrors}n${r.p.nodes}s${r.p.solutions}#${r.order}=${r.secs.toFixed(1)}`).join(" ");
   try { localStorage.setItem("laser-test", line); } catch {}
   $("#resBody").insertAdjacentHTML("beforeend",
     `<div class="hint" style="margin-top:10px">알려 주실 한 줄 —
