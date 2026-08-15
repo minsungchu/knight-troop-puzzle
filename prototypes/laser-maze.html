@@ -445,17 +445,58 @@ function startTest() {
   load(set[0]);
 }
 
+/** 스피어만 순위 상관. 동점은 평균 순위로 매긴다 — 점수가 겹치는 판이 있다. */
+function spearman(a, b) {
+  const rk = (v) => {
+    const idx = v.map((x, i) => [x, i]).sort((p, q) => p[0] - q[0]);
+    const r = []; let i = 0;
+    while (i < idx.length) {
+      let j = i;
+      while (j + 1 < idx.length && idx[j + 1][0] === idx[i][0]) j++;
+      const avg = (i + j) / 2 + 1;
+      for (let k = i; k <= j; k++) r[idx[k][1]] = avg;
+      i = j + 1;
+    }
+    return r;
+  };
+  const ra = rk(a), rb = rk(b), n = a.length;
+  const ma = ra.reduce((s, x) => s + x, 0) / n, mb = rb.reduce((s, x) => s + x, 0) / n;
+  let nu = 0, da = 0, db = 0;
+  for (let i = 0; i < n; i++) { nu += (ra[i] - ma) * (rb[i] - mb); da += (ra[i] - ma) ** 2; db += (rb[i] - mb) ** 2; }
+  return da && db ? nu / Math.sqrt(da * db) : 0;
+}
+
+/** 피셔 변환으로 ρ 의 대략적인 95% 구간 */
+function ci(r, n) {
+  if (n < 5) return [-1, 1];
+  const rr = Math.max(-0.999, Math.min(0.999, r));
+  const z = 0.5 * Math.log((1 + rr) / (1 - rr)), se = 1.06 / Math.sqrt(n - 3);
+  const back = (v) => (Math.exp(2 * v) - 1) / (Math.exp(2 * v) + 1);
+  return [back(z - 1.96 * se), back(z + 1.96 * se)];
+}
+
 function showResults() {
   const rows = test.times.slice();
   const byScore = [...rows].sort((a, b) => a.p.score - b.p.score);
   const byTime = [...rows].sort((a, b) => a.secs - b.secs);
   const rank = (arr, r) => arr.indexOf(r) + 1;
 
-  // 스피어만 순위 상관
+  /* 열 판짜리 한 회차의 ρ 는 95% 구간이 ±0.6 쯤 된다. 실제로 같은 사양에서
+     0.78 과 0.36 이 연달아 나왔다. 회차 하나로 합격·불합격을 가르면 안 된다 —
+     지난 회차와 합쳐서 보고, 구간과 연습 효과를 같이 보여 준다. */
   const n = rows.length;
-  let d2 = 0;
-  for (const r of rows) d2 += (rank(byScore, r) - rank(byTime, r)) ** 2;
-  const rho = 1 - (6 * d2) / (n * (n * n - 1));
+  const rho = spearman(rows.map((r) => r.p.score), rows.map((r) => r.secs));
+  const practice = spearman(rows.map((r) => r.order), rows.map((r) => r.secs));
+
+  // 회차마다 실력·컨디션이 다르므로 시간을 그 회차 중앙값으로 나눠 맞춘 뒤 합친다
+  const mid = rows.map((r) => r.secs).sort((a, b) => a - b)[n >> 1];
+  const mine = rows.map((r) => ({ s: r.p.score, t: r.secs / mid }));
+  let past = [];
+  try { past = JSON.parse(localStorage.getItem("laser-runs") || "[]"); } catch {}
+  const pooled = [...past, ...mine];
+  try { localStorage.setItem("laser-runs", JSON.stringify(pooled.slice(-300))); } catch {}
+  const pr = spearman(pooled.map((r) => r.s), pooled.map((r) => r.t));
+  const band = ci(pr, pooled.length), band1 = ci(rho, n);
 
   $("#resBody").innerHTML = `
     <table>
@@ -472,11 +513,15 @@ function showResults() {
       </tr>`).join("")}</tbody>
     </table>
     <div class="hint">
-      <b>순위 상관 ρ = ${rho.toFixed(2)}</b> — 1에 가까울수록 점수가 체감과 같은 순서라는 뜻입니다.
-      <span class="${rho >= 0.7 ? "good" : "bad"}">${rho >= 0.7
-        ? "0.7 이상이면 통과로 봅니다. 난이도 점수를 그대로 써도 됩니다."
-        : "0.7 미만입니다. 점수 공식을 손봐야 합니다 — 노드 수 말고 다른 지표를 섞어야 할 수 있습니다."}</span>
-      <br>한 판만 유난히 오래 걸렸다면 그 판이 이상한 것일 수 있으니, 한 번 더 돌려 보시는 편이 좋습니다.
+      <b>이번 회차 ρ = ${rho.toFixed(2)}</b> — 10판이라 95% 구간이 ${band1[0].toFixed(2)}~${band1[1].toFixed(2)} 로 넓습니다.<br>
+      <b>지금까지 ${pooled.length}판을 합치면 ρ = ${pr.toFixed(2)}</b> (95% 구간 ${band[0].toFixed(2)}~${band[1].toFixed(2)})
+      <span class="${band[0] >= 0.5 ? "good" : "bad"}">${band[0] >= 0.5
+        ? "구간 아래쪽이 0.5 를 넘습니다 — 이 점수로 단계를 배정해도 됩니다."
+        : "아직 판이 모자랍니다. 한 회차 더 돌리면 구간이 좁아집니다."}</span><br>
+      <b>연습 효과 ${practice.toFixed(2)}</b> — ${practice < -0.4
+        ? "뒤로 갈수록 뚜렷하게 빨라졌습니다. 이 회차는 난이도보다 손에 익는 정도를 재고 있어 ρ 가 낮게 나옵니다."
+        : "푼 순서는 시간에 별 영향을 주지 않았습니다."}
+      <br>회차 하나의 ρ 로 판정하지 마세요. 열 판으로는 0.36 과 0.78 을 구별할 수 없습니다.
     </div>`;
   // 결과가 새로고침으로 날아가면 다시 풀어야 한다. 남겨 두고, 한 줄 요약도 붙인다.
   // 지난번엔 점수와 시간만 남겨서, 노드 수를 점수에서 거꾸로 풀어내야 했다.
