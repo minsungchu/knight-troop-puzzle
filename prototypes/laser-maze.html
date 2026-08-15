@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Laser Maze — 프로토타입</title>
+<style>
+:root{
+  --void:#080d16; --deep:#0e1726; --stone-1:#23344b; --stone-2:#2d4159;
+  --brass:#c9973f; --parch:#ece2cb; --mist:#93a7c0;
+  --beam:#ffd98a; --hit:#6fe3b0; --miss:#e0576d;
+  --cell:56px;
+  --display:"Gowun Batang","Nanum Myeongjo",Georgia,serif;
+  --body:"Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  min-height:100vh; background:
+    radial-gradient(1100px 700px at 50% -12%, #1c2c46 0%, transparent 62%),
+    radial-gradient(1500px 460px at 50% 116%, rgba(178,112,58,.22) 0%, transparent 70%),
+    var(--void);
+  color:var(--parch); font-family:var(--body);
+}
+.wrap{max-width:1080px; margin:0 auto; padding:22px 16px 80px}
+h1{font-family:var(--display); font-size:24px; margin:0}
+.sub{font-size:12px; color:var(--mist); letter-spacing:.14em; margin-top:5px}
+.warn{margin-top:14px; padding:11px 15px; border-radius:8px; font-size:12.5px; line-height:1.7;
+  background:rgba(201,151,63,.09); border:1px solid rgba(201,151,63,.35); color:#d6e0ee}
+
+.bar{display:flex; flex-wrap:wrap; gap:9px; align-items:center; margin-top:18px}
+button{
+  font-family:var(--body); font-size:13px; color:var(--parch); cursor:pointer;
+  background:linear-gradient(#1d2c43,#15202f); border:1px solid rgba(201,151,63,.34);
+  padding:8px 13px; border-radius:5px; transition:.15s;
+}
+button:hover{border-color:var(--brass); background:linear-gradient(#26374f,#182437)}
+button.on{background:linear-gradient(#c9973f,#9c7024); color:#1a1206; border-color:#e0b45c; font-weight:700}
+button[disabled]{opacity:.35; pointer-events:none}
+label{font-size:12px; color:var(--mist); display:inline-flex; align-items:center; gap:7px}
+input[type=range]{accent-color:var(--brass); width:150px}
+
+.status{display:flex; flex-wrap:wrap; gap:8px 24px; margin-top:16px; font-size:12.5px; color:var(--mist)}
+.status b{font-family:var(--mono); color:var(--parch); margin-left:7px; font-variant-numeric:tabular-nums}
+.tag{border:1px solid rgba(201,151,63,.4); border-radius:99px; padding:3px 11px; font-size:11px; color:var(--brass)}
+.tag.ok{color:var(--hit); border-color:rgba(111,227,176,.5)}
+
+.stage{display:flex; justify-content:center; padding:26px 0 8px; perspective:1400px}
+.board{position:relative; transform:rotateX(14deg); transform-style:preserve-3d}
+.plinth{position:absolute; inset:-20px; border-radius:12px; transform:translateZ(-14px);
+  background:linear-gradient(160deg,#1b2b42,#0d1626 60%); border:1px solid rgba(201,151,63,.3);
+  box-shadow:0 36px 64px rgba(0,0,0,.62), inset 0 0 60px rgba(0,0,0,.5)}
+.grid{display:grid; gap:4px; position:relative}
+.cell{
+  width:var(--cell); height:var(--cell); border-radius:6px; position:relative; cursor:pointer;
+  background:linear-gradient(150deg,var(--stone-2),var(--stone-1));
+  box-shadow:0 1px 0 #1a2637,0 3px 0 #131d29,0 6px 10px rgba(0,0,0,.5);
+  display:flex; align-items:center; justify-content:center; transition:.13s;
+}
+.cell:hover{transform:translateY(-2px)}
+.cell.wall{background:linear-gradient(150deg,#171d27,#0d1117); box-shadow:inset 0 0 14px rgba(0,0,0,.8); cursor:default}
+.cell.fixed{cursor:default}
+.cell.target{background:linear-gradient(150deg,#2a1c2e,#1a1220)}
+.cell.target.lit{background:linear-gradient(150deg,#1c4636,#123024); box-shadow:0 0 22px -2px var(--hit),0 3px 0 #0a1119}
+.mark{font-family:var(--mono); font-size:calc(var(--cell)*.5); line-height:1; user-select:none}
+.mirror{color:#dfe9f5; text-shadow:0 0 10px rgba(255,255,255,.55),0 2px 3px #000}
+.split{color:#b98cf0; text-shadow:0 0 12px rgba(185,140,240,.8)}
+.tshape{width:calc(var(--cell)*.42); height:calc(var(--cell)*.42); border:3px solid var(--miss)}
+.tshape.c0{border-radius:50%}
+.tshape.c1{border-radius:3px; transform:rotate(45deg)}
+.cell.target.lit .tshape{border-color:var(--hit); box-shadow:0 0 16px var(--hit)}
+.src{position:absolute; font-size:20px; color:var(--brass); text-shadow:0 0 12px var(--brass)}
+
+svg.beam{position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible}
+/* 발광은 선을 겹쳐서 낸다. SVG 필터를 쓰면 수직·수평선의 바운딩 박스가 납작해
+   objectBoundingBox 기준 필터 영역이 사라지고 아무것도 안 그려진다. */
+.beam-halo{stroke:var(--beam); stroke-width:14; stroke-linecap:round; opacity:.10}
+.beam-mid{stroke:var(--beam); stroke-width:7; stroke-linecap:round; opacity:.22}
+.beam-core{stroke:#fff6df; stroke-width:2.6; stroke-linecap:round; opacity:.95}
+
+.panel{margin-top:22px; border:1px solid rgba(201,151,63,.24); border-radius:10px; background:rgba(13,22,36,.6); padding:16px 18px}
+.panel h2{font-family:var(--display); font-size:15px; margin:0 0 10px; color:var(--brass)}
+table{width:100%; border-collapse:collapse; font-size:12.5px}
+th{text-align:left; font-weight:400; font-size:10.5px; letter-spacing:.14em; color:var(--mist); padding:8px 10px; border-bottom:1px solid rgba(201,151,63,.2)}
+td{padding:7px 10px; border-bottom:1px solid rgba(201,151,63,.08); color:#c6d3e3}
+td.num{font-family:var(--mono); text-align:right; font-variant-numeric:tabular-nums}
+.good{color:var(--hit)} .bad{color:var(--miss)}
+.hint{font-size:11.5px; color:var(--mist); line-height:1.7; margin-top:10px}
+/* alert() 는 쓰지 않는다 — 브라우저를 멈춰 세우고 자동 검증도 막는다 */
+.say{max-width:560px; margin:6px auto 0; padding:12px 16px; border-radius:8px; text-align:center;
+  font-size:13.5px; line-height:1.7; background:rgba(20,32,50,.85); border:1px solid rgba(201,151,63,.45)}
+.say b{color:var(--brass)}
+.say.win{border-color:rgba(111,227,176,.6); background:rgba(18,48,36,.85)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Laser Maze — 프로토타입</h1>
+  <div class="sub">GENERATOR · DIFFICULTY · PLAYABILITY</div>
+
+  <div class="warn">
+    <b>이건 본 게임이 아니라 검증용입니다.</b> 확인할 것은 셋 — ① 판 하나를 500ms 안에 만드는가,
+    ② <b>난이도 점수가 체감과 같은 순서인가</b>, ③ 80단계를 채울 만큼 고르게 퍼지는가.
+    ①③은 이미 통과했고, <b>②는 직접 풀어 보셔야</b> 압니다. 아래 <b>체감 테스트</b>를 눌러 주세요.
+  </div>
+
+  <div class="bar">
+    <button id="btnNew">새 문제</button>
+    <label>난이도 <input type="range" id="lvl" min="0" max="100" value="40"><span id="lvlOut" style="font-family:var(--mono)">40</span></label>
+    <button id="btnAnswer">정답 보기</button>
+    <button id="btnClear">전부 치우기</button>
+    <span style="flex:1"></span>
+    <button id="btnTest" class="on">체감 테스트 시작</button>
+  </div>
+
+  <div class="status">
+    <span>남은 거울<b id="stM">0</b></span>
+    <span>목표<b id="stT">0</b></span>
+    <span>경과<b id="stTime">0.0초</b></span>
+    <span class="tag" id="stSpec">—</span>
+    <span class="tag" id="stScore">난이도 —</span>
+  </div>
+
+  <div class="stage"><div class="board" id="board"></div></div>
+  <div id="say" class="say" hidden></div>
+
+  <div class="panel" id="results" hidden>
+    <h2>체감 테스트 결과</h2>
+    <div id="resBody"></div>
+  </div>
+
+  <div class="panel">
+    <h2>조작</h2>
+    <div class="hint">
+      빈 칸을 누르면 거울이 <b>／</b> → <b>＼</b> → 없음 순서로 바뀝니다.
+      거울을 <b>전부</b> 놓고 <b>모든 목표</b>에 빛이 닿으면 성공입니다.
+      보라색은 <b>분광기</b>로 빛이 갈라지고, 검은 칸은 벽입니다.
+      목표는 색과 모양이 둘 다 다릅니다(원·마름모) — 색각과 무관하게 구분됩니다.
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { makePuzzle, trace, targetsOf, at, inside,
+         EMPTY, WALL, TARGET, SPLIT_SLASH, SPLIT_BACK,
+         MIRROR_SLASH, MIRROR_BACK, DX, DY } from "./laser-engine.js";
+
+const $ = (s) => document.querySelector(s);
+
+/* 난이도 슬라이더(0~100) → 생성 규격. 21~100단계 구간을 그대로 흉내낸다. */
+function specFor(level) {
+  const t = level / 100;
+  if (t < 0.18) return { W:5,H:5, mirrors:2+Math.round(t*6), walls:1, splitters:0, targets:1 };
+  if (t < 0.40) return { W:6,H:6, mirrors:3+Math.round((t-0.18)*9), walls:3, splitters:0, targets:1 };
+  if (t < 0.62) return { W:7,H:7, mirrors:4+Math.round((t-0.40)*9), walls:4, splitters:1, targets:1 };
+  if (t < 0.82) return { W:7,H:7, mirrors:5+Math.round((t-0.62)*10), walls:5, splitters:1, targets:2 };
+  return { W:8,H:8, mirrors:7+Math.round((t-0.82)*11), walls:7, splitters:2, targets:2 };
+}
+
+let P = null;              // 현재 문제
+let placed = new Map();    // 내가 놓은 거울
+let t0 = 0, timer = null;
+let test = null;           // 체감 테스트 상태
+
+function newPuzzle(level, seed) {
+  const spec = specFor(level);
+  for (let i = 0; i < 3000; i++) {
+    const p = makePuzzle(spec, (seed ?? ((Math.random() * 2 ** 31) | 0)) + i * 7919);
+    if (p) return p;
+  }
+  return null;
+}
+
+function load(p) {
+  P = p; placed = new Map();
+  const sayEl = $("#say"); if (sayEl && !test) sayEl.hidden = true;
+  $("#stSpec").textContent = `${p.spec.W}×${p.spec.H} · 거울 ${p.spec.mirrors}`;
+  $("#stScore").textContent = test ? "난이도 ??" : `난이도 ${p.score}`;
+  t0 = performance.now();
+  clearInterval(timer);
+  timer = setInterval(() => { $("#stTime").textContent = ((performance.now() - t0) / 1000).toFixed(1) + "초"; }, 100);
+  build();
+}
+
+function build() {
+  const b = P.board;
+  document.documentElement.style.setProperty("--cell", (b.W > 7 ? 48 : 56) + "px");
+  const board = $("#board");
+  board.innerHTML = `<div class="plinth"></div><div class="grid" id="grid"></div>`;
+  const g = $("#grid");
+  g.style.gridTemplateColumns = `repeat(${b.W}, var(--cell))`;
+
+  let html = "";
+  for (let y = 0; y < b.H; y++) for (let x = 0; x < b.W; x++) {
+    const c = at(b, x, y);
+    let cls = "cell", inner = "";
+    if (c === WALL) cls += " wall";
+    else if (c === TARGET) { cls += " target"; inner = `<div class="tshape c${(y * b.W + x) % 2}"></div>`; }
+    else if (c === SPLIT_SLASH) { cls += " fixed"; inner = `<span class="mark split">／</span>`; }
+    else if (c === SPLIT_BACK) { cls += " fixed"; inner = `<span class="mark split">＼</span>`; }
+    html += `<div class="${cls}" data-x="${x}" data-y="${y}">${inner}</div>`;
+  }
+  g.innerHTML = html + `<svg class="beam" id="beam"></svg>`;
+  render();
+}
+
+function cellSize() {
+  return parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--cell"));
+}
+
+function render() {
+  const b = P.board, cs = cellSize(), gap = 4, step = cs + gap;
+  const r = trace(b, placed);
+
+  // 거울과 목표 상태
+  for (const el of document.querySelectorAll(".cell")) {
+    const x = +el.dataset.x, y = +el.dataset.y, c = at(b, x, y);
+    if (c === TARGET) { el.classList.toggle("lit", r.hits.has(y * b.W + x)); continue; }
+    if (c !== EMPTY) continue;
+    const m = placed.get(`${x},${y}`);
+    el.innerHTML = m ? `<span class="mark mirror">${m === MIRROR_SLASH ? "／" : "＼"}</span>` : "";
+  }
+
+  // 빛줄기
+  const svg = $("#beam");
+  const cx = (v) => v * step + cs / 2;
+  const layer = (cls) => r.segs.map((s) =>
+    `<line class="${cls}" x1="${cx(s.x1)}" y1="${cx(s.y1)}" x2="${cx(s.x2)}" y2="${cx(s.y2)}"/>`).join("");
+  svg.innerHTML = layer("beam-halo") + layer("beam-mid") + layer("beam-core");
+
+  // 광원 표시
+  const s = b.src, arrow = ["▶","▼","◀","▲"][s.dir];
+  const sx = cx(s.x), sy = cx(s.y);
+  svg.insertAdjacentHTML("beforeend",
+    `<text x="${sx}" y="${sy + 7}" text-anchor="middle" fill="#c9973f" font-size="20"
+       style="filter:drop-shadow(0 0 8px #c9973f)">${arrow}</text>`);
+
+  const need = targetsOf(b);
+  $("#stM").textContent = `${P.spec.mirrors - placed.size} / ${P.spec.mirrors}`;
+  $("#stT").textContent = `${[...r.hits].length} / ${need.length}`;
+
+  const won = placed.size === P.spec.mirrors && need.every((t) => r.hits.has(t));
+  $("#stT").parentElement.classList.toggle("ok", won);
+  if (won) onWin();
+}
+
+let sayTimer = null;
+function say(html, win) {
+  const el = $("#say");
+  el.innerHTML = html; el.hidden = false;
+  el.classList.toggle("win", !!win);
+  clearTimeout(sayTimer);
+  sayTimer = setTimeout(() => { el.hidden = true; }, 4200);
+}
+
+let winLock = false;
+function onWin() {
+  if (winLock) return;
+  winLock = true;
+  clearInterval(timer);
+  const secs = (performance.now() - t0) / 1000;
+  setTimeout(() => {
+    winLock = false;
+    if (test) { recordTest(secs); return; }
+    say(`<b>성공!</b> ${secs.toFixed(1)}초 · 난이도 ${P.score}`, true);
+  }, 260);
+}
+
+$("#grid") && null;
+document.addEventListener("click", (e) => {
+  const el = e.target.closest(".cell");
+  if (!el || !P) return;
+  const x = +el.dataset.x, y = +el.dataset.y;
+  if (at(P.board, x, y) !== EMPTY) return;
+  const k = `${x},${y}`, cur = placed.get(k);
+  if (!cur) { if (placed.size < P.spec.mirrors) placed.set(k, MIRROR_SLASH); }
+  else if (cur === MIRROR_SLASH) placed.set(k, MIRROR_BACK);
+  else placed.delete(k);
+  render();
+});
+
+$("#lvl").oninput = (e) => { $("#lvlOut").textContent = e.target.value; };
+$("#btnNew").onclick = () => {
+  const p = newPuzzle(+$("#lvl").value);
+  if (!p) { say("이 난이도에서 문제를 만들지 못했습니다. 슬라이더를 조금 옮겨 보세요."); return; }
+  test = null; $("#btnTest").textContent = "체감 테스트 시작"; $("#btnTest").classList.add("on");
+  load(p);
+};
+$("#btnAnswer").onclick = () => { if (P) { placed = new Map(P.answer); render(); } };
+$("#btnClear").onclick = () => { placed = new Map(); render(); };
+
+/* ══════════════ 체감 테스트 ══════════════
+   점수를 가린 채 난이도가 다른 8판을 무작위 순서로 낸다.
+   다 풀면 '푸는 데 걸린 시간 순서'와 '점수 순서'를 나란히 놓고 비교한다.
+   둘의 순위 상관이 높으면 점수가 체감을 반영한다는 뜻이다. */
+function startTest() {
+  const levels = [10, 22, 34, 46, 58, 70, 82, 94];
+  const set = [];
+  for (const L of levels) { const p = newPuzzle(L); if (p) set.push(p); }
+  if (set.length < 5) { say("문제를 충분히 만들지 못했습니다."); return; }
+  for (let i = set.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [set[i], set[j]] = [set[j], set[i]]; }
+  test = { set, i: 0, times: [] };
+  $("#results").hidden = true;
+  $("#btnTest").textContent = "테스트 진행 중…";
+  $("#btnTest").classList.remove("on");
+  load(set[0]);
+}
+
+function recordTest(secs) {
+  test.times.push({ p: test.set[test.i], secs });
+  test.i++;
+  if (test.i < test.set.length) {
+    say(`<b>${test.i} / ${test.set.length}</b> 완료 — ${secs.toFixed(1)}초. 다음 판이 나왔습니다.`, true);
+    load(test.set[test.i]);
+  } else {
+    showResults();
+  }
+}
+
+function showResults() {
+  const rows = test.times.slice();
+  const byScore = [...rows].sort((a, b) => a.p.score - b.p.score);
+  const byTime = [...rows].sort((a, b) => a.secs - b.secs);
+  const rank = (arr, r) => arr.indexOf(r) + 1;
+
+  // 스피어만 순위 상관
+  const n = rows.length;
+  let d2 = 0;
+  for (const r of rows) d2 += (rank(byScore, r) - rank(byTime, r)) ** 2;
+  const rho = 1 - (6 * d2) / (n * (n * n - 1));
+
+  $("#resBody").innerHTML = `
+    <table>
+      <thead><tr><th>점수 순위</th><th>난이도 점수</th><th>규격</th><th>걸린 시간</th><th>시간 순위</th></tr></thead>
+      <tbody>${byScore.map((r) => `<tr>
+        <td class="num">${rank(byScore, r)}</td>
+        <td class="num">${r.p.score}</td>
+        <td>${r.p.spec.W}×${r.p.spec.H} 거울 ${r.p.spec.mirrors}</td>
+        <td class="num">${r.secs.toFixed(1)}초</td>
+        <td class="num ${rank(byTime, r) === rank(byScore, r) ? "good" : ""}">${rank(byTime, r)}</td>
+      </tr>`).join("")}</tbody>
+    </table>
+    <div class="hint">
+      <b>순위 상관 ρ = ${rho.toFixed(2)}</b> — 1에 가까울수록 점수가 체감과 같은 순서라는 뜻입니다.
+      <span class="${rho >= 0.7 ? "good" : "bad"}">${rho >= 0.7
+        ? "0.7 이상이면 통과로 봅니다. 난이도 점수를 그대로 써도 됩니다."
+        : "0.7 미만입니다. 점수 공식을 손봐야 합니다 — 노드 수 말고 다른 지표를 섞어야 할 수 있습니다."}</span>
+      <br>한 판만 유난히 오래 걸렸다면 그 판이 이상한 것일 수 있으니, 한 번 더 돌려 보시는 편이 좋습니다.
+    </div>`;
+  $("#results").hidden = false;
+  $("#btnTest").textContent = "체감 테스트 다시";
+  $("#btnTest").classList.add("on");
+  test = null;
+  $("#results").scrollIntoView({ behavior: "smooth" });
+}
+
+$("#btnTest").onclick = startTest;
+
+// 시작
+load(newPuzzle(40));
+</script>
+</body>
+</html>
