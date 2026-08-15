@@ -47,7 +47,13 @@ button[disabled]{opacity:.35; pointer-events:none}
 label{font-size:12px; color:var(--mist); display:inline-flex; align-items:center; gap:7px}
 input[type=range]{accent-color:var(--brass); width:150px}
 
-.status{display:flex; flex-wrap:wrap; gap:8px 24px; margin-top:16px; font-size:12.5px; color:var(--mist)}
+/* 통과 조건은 판을 보는 자리에 있어야 한다. 아래 설명 패널에 묻어 두면 아무도 안 읽는다. */
+.goal{margin-top:16px; padding:10px 14px; border-radius:8px; font-size:13.5px; line-height:1.6;
+  background:rgba(23,38,58,.7); border:1px solid rgba(201,151,63,.3)}
+.goal b{color:var(--brass); font-variant-numeric:tabular-nums}
+.goal .done{color:var(--hit)}
+.goal .todo{color:var(--miss)}
+.status{display:flex; flex-wrap:wrap; gap:8px 24px; margin-top:12px; font-size:12.5px; color:var(--mist)}
 .status b{font-family:var(--mono); color:var(--parch); margin-left:7px; font-variant-numeric:tabular-nums}
 .tag{border:1px solid rgba(201,151,63,.4); border-radius:99px; padding:3px 11px; font-size:11px; color:var(--brass)}
 .tag.ok{color:var(--hit); border-color:rgba(111,227,176,.5)}
@@ -77,11 +83,19 @@ input[type=range]{accent-color:var(--brass); width:150px}
 .tshape.c0{border-radius:50%}
 .tshape.c1{border-radius:3px; transform:rotate(45deg)}
 .cell.target.lit .tshape{border-color:var(--hit); box-shadow:0 0 16px var(--hit)}
-.src{position:absolute; font-size:20px; color:var(--brass); text-shadow:0 0 12px var(--brass)}
+/* 광원은 판 바깥(-1 또는 W)에 있다. 격자 칸이 아니라서 절대 배치로 얹는다.
+   화살표만 띄워 두면 판 옆에 뜬금없이 떠 있는 글자로 보여, 어디서 빛이
+   출발하는지 알 수 없다. 받침대처럼 생긴 발사구로 그려 준다. */
+.emitter{position:absolute; width:var(--cell); height:var(--cell); border-radius:6px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px;
+  background:linear-gradient(150deg,#6b4d18,#2e2008); border:1px solid rgba(224,180,92,.8);
+  box-shadow:0 0 30px -4px var(--brass), 0 3px 0 #0a1119; pointer-events:none}
+.emit-arrow{font-size:calc(var(--cell)*.4); line-height:1; color:#ffe6ae; text-shadow:0 0 10px var(--brass)}
+.emit-tag{font-size:calc(var(--cell)*.21); line-height:1; letter-spacing:.04em; color:#f0d69c}
 
 svg.beam{position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible}
 /* 발광은 선을 겹쳐서 낸다. SVG 필터를 쓰면 수직·수평선의 바운딩 박스가 납작해
-   objectBoundingBox 기준 필터 영역이 사라지고 아무것도 안 그려진다. */
+   objectBoundingBox 기준 필터 영역이 사라지고 아무것도 안 그려진다.
    굵기는 칸 크기에 비례해야 한다 — 좁은 화면에서 칸이 절반이 되면
    고정 굵기 광선이 칸을 통째로 덮어 버린다. */
 .beam-halo{stroke:var(--beam); stroke-width:calc(var(--cell)*.25); stroke-linecap:round; opacity:.10}
@@ -123,9 +137,11 @@ td.num{font-family:var(--mono); text-align:right; font-variant-numeric:tabular-n
     <button id="btnTest" class="on">체감 테스트 시작</button>
   </div>
 
+  <div class="goal" id="goal">—</div>
+
   <div class="status">
-    <span>남은 거울<b id="stM">0</b></span>
-    <span>목표<b id="stT">0</b></span>
+    <span>놓은 거울<b id="stM">0</b></span>
+    <span>밝힌 목표<b id="stT">0</b></span>
     <span>경과<b id="stTime">0.0초</b></span>
     <span class="tag" id="stSpec">—</span>
     <span class="tag" id="stScore">난이도 —</span>
@@ -140,11 +156,15 @@ td.num{font-family:var(--mono); text-align:right; font-variant-numeric:tabular-n
   </div>
 
   <div class="panel">
-    <h2>조작</h2>
+    <h2>규칙</h2>
     <div class="hint">
-      빈 칸을 누르면 거울이 <b>／</b> → <b>＼</b> → 없음 순서로 바뀝니다.
-      거울을 <b>전부</b> 놓고 <b>모든 목표</b>에 빛이 닿으면 성공입니다.
-      보라색은 <b>분광기</b>로 빛이 갈라지고, 검은 칸은 벽입니다.
+      <b>빛</b>은 판 <b>바깥</b>에 붙은 황금색 <b>출발</b> 발사구에서 화살표 방향으로 들어와, 거울에 부딪힐 때까지 직진합니다.<br>
+      <b>거울</b>은 빈 칸을 눌러 <b>／</b> → <b>＼</b> → 없음 순서로 바꿉니다. 벽·목표·분광기 칸에는 못 놓습니다.<br>
+      <b>성공 조건은 둘 다</b>입니다 — 주어진 거울을 <b>하나도 남기지 않고</b> 놓고,
+      <b>모든 목표</b>에 빛이 닿아야 합니다. 하나만 채워서는 안 됩니다.<br>
+      <b>분광기</b>(보라색 ／＼)는 판에 붙박이로, 빛을 <b>둘로 가릅니다</b> — 직진분과 반사분이 함께 갑니다.
+      목표가 둘일 때는 대개 이걸 써야 둘 다 닿습니다.<br>
+      <b>벽</b>(검은 칸)은 빛을 삼킵니다. 판 밖으로 나간 빛도 사라집니다.<br>
       목표는 색과 모양이 둘 다 다릅니다(원·마름모) — 색각과 무관하게 구분됩니다.
     </div>
   </div>
@@ -248,7 +268,7 @@ function build() {
     else if (c === SPLIT_BACK) { cls += " fixed"; inner = `<span class="mark split">＼</span>`; }
     html += `<div class="${cls}" data-x="${x}" data-y="${y}">${inner}</div>`;
   }
-  g.innerHTML = html + `<svg class="beam" id="beam"></svg>`;
+  g.innerHTML = html + `<div class="emitter" id="emitter"></div><svg class="beam" id="beam"></svg>`;
   render();
 }
 
@@ -277,42 +297,74 @@ function render() {
     `<line class="${cls}" x1="${cx(s.x1)}" y1="${cx(s.y1)}" x2="${cx(s.x2)}" y2="${cx(s.y2)}"/>`).join("");
   svg.innerHTML = layer("beam-halo") + layer("beam-mid") + layer("beam-core");
 
-  // 광원 표시
-  const s = b.src, arrow = ["▶","▼","◀","▲"][s.dir];
-  const sx = cx(s.x), sy = cx(s.y), fs = Math.max(11, cs * 0.36);
-  svg.insertAdjacentHTML("beforeend",
-    `<text x="${sx}" y="${sy + fs * 0.35}" text-anchor="middle" fill="#c9973f" font-size="${fs}"
-       style="filter:drop-shadow(0 0 8px #c9973f)">${arrow}</text>`);
+  // 광원 발사구 — 판 바깥 좌표라 격자 밖에 얹힌다
+  const em = $("#emitter"), s = b.src;
+  em.style.left = (cx(s.x) - cs / 2) + "px";
+  em.style.top = (cx(s.y) - cs / 2) + "px";
+  em.innerHTML = `<span class="emit-arrow">${["▶","▼","◀","▲"][s.dir]}</span><span class="emit-tag">출발</span>`;
 
   const need = targetsOf(b);
-  $("#stM").textContent = `${P.spec.mirrors - placed.size} / ${P.spec.mirrors}`;
-  $("#stT").textContent = `${[...r.hits].length} / ${need.length}`;
+  const lit = need.filter((t) => r.hits.has(t)).length;
+  const allMirrors = placed.size === P.spec.mirrors;
+  const allLit = lit === need.length;
 
-  const won = placed.size === P.spec.mirrors && need.every((t) => r.hits.has(t));
+  $("#stM").textContent = `${placed.size} / ${P.spec.mirrors}`;
+  $("#stT").textContent = `${lit} / ${need.length}`;
+
+  // 통과 조건을 매 순간 글자로 적어 둔다. 둘 다 채워야 성공이라는 게 핵심이다.
+  const mark = (ok, txt) => `<span class="${ok ? "done" : "todo"}">${ok ? "✓" : "•"} ${txt}</span>`;
+  $("#goal").innerHTML =
+    `성공 조건 — ${mark(allMirrors, `거울 <b>${P.spec.mirrors}개를 모두</b> 놓기 (지금 ${placed.size}개)`)}` +
+    ` &nbsp;그리고&nbsp; ${mark(allLit, `목표 <b>${need.length}곳 전부</b> 밝히기 (지금 ${lit}곳)`)}` +
+    `<br><span style="color:var(--mist);font-size:12px">빛은 판 옆 <b style="color:#e8c98a">출발</b> 발사구에서 화살표 방향으로 들어옵니다.` +
+    (allMirrors && !allLit ? ` 거울은 다 놓았지만 아직 어두운 목표가 있습니다 — 배치를 바꿔 보세요.` : ``) +
+    `</span>`;
+
+  const won = allMirrors && allLit;
   $("#stT").parentElement.classList.toggle("ok", won);
   if (won) onWin();
 }
 
 let sayTimer = null;
-function say(html, win) {
+/** sticky 면 스스로 사라지지 않는다 — 안에 눌러야 할 버튼이 있을 때 쓴다. */
+function say(html, win, sticky) {
   const el = $("#say");
   el.innerHTML = html; el.hidden = false;
   el.classList.toggle("win", !!win);
   clearTimeout(sayTimer);
+  if (sticky) return;
   sayTimer = setTimeout(() => { el.hidden = true; }, 4200);
 }
 
 let winLock = false;
+/* 다 풀면 바로 다음 판으로 넘기지 않는다. 시계만 멈추고 완성된 빛줄기를
+   그대로 둔 채, 넘어갈지는 누르는 사람이 정한다. */
 function onWin() {
   if (winLock) return;
   winLock = true;
   clearInterval(timer);
   const secs = (performance.now() - t0) / 1000;
-  setTimeout(() => {
-    winLock = false;
-    if (test) { recordTest(secs); return; }
-    say(`<b>성공!</b> ${secs.toFixed(1)}초 · 난이도 ${P.score}`, true);
-  }, 260);
+
+  if (test) {
+    test.times.push({ p: test.set[test.i], secs });   // 기록은 바로 남긴다 — 시간은 여기서 끝났다
+    const last = test.i === test.set.length - 1;
+    say(`<b>${test.i + 1} / ${test.set.length} 완성</b> — ${secs.toFixed(1)}초.
+      완성된 빛줄기를 확인하고 넘어가세요.
+      <button id="btnNext" style="margin-left:10px">${last ? "결과 보기" : "다음 판"}</button>`, true, true);
+  } else {
+    say(`<b>성공!</b> ${secs.toFixed(1)}초 · 난이도 ${P.score}
+      <button id="btnNext" style="margin-left:10px">다음 문제</button>`, true, true);
+  }
+  $("#btnNext").onclick = advance;
+}
+
+function advance() {
+  winLock = false;
+  $("#say").hidden = true;
+  if (!test) { load(newPuzzle(+$("#lvl").value)); return; }
+  test.i++;
+  if (test.i < test.set.length) load(test.set[test.i]);
+  else showResults();
 }
 
 $("#grid") && null;
@@ -355,17 +407,6 @@ function startTest() {
   load(set[0]);
 }
 
-function recordTest(secs) {
-  test.times.push({ p: test.set[test.i], secs });
-  test.i++;
-  if (test.i < test.set.length) {
-    say(`<b>${test.i} / ${test.set.length}</b> 완료 — ${secs.toFixed(1)}초. 다음 판이 나왔습니다.`, true);
-    load(test.set[test.i]);
-  } else {
-    showResults();
-  }
-}
-
 function showResults() {
   const rows = test.times.slice();
   const byScore = [...rows].sort((a, b) => a.p.score - b.p.score);
@@ -396,6 +437,14 @@ function showResults() {
         : "0.7 미만입니다. 점수 공식을 손봐야 합니다 — 노드 수 말고 다른 지표를 섞어야 할 수 있습니다."}</span>
       <br>한 판만 유난히 오래 걸렸다면 그 판이 이상한 것일 수 있으니, 한 번 더 돌려 보시는 편이 좋습니다.
     </div>`;
+  // 결과가 새로고침으로 날아가면 다시 풀어야 한다. 남겨 두고, 한 줄 요약도 붙인다.
+  const line = `ρ=${rho.toFixed(2)} | ` +
+    byScore.map((r) => `${r.p.score}:${r.secs.toFixed(1)}s`).join(" ");
+  try { localStorage.setItem("laser-test", line); } catch {}
+  $("#resBody").insertAdjacentHTML("beforeend",
+    `<div class="hint" style="margin-top:10px">알려 주실 한 줄 —
+       <code style="user-select:all; color:var(--parch)">${line}</code></div>`);
+
   $("#results").hidden = false;
   $("#btnTest").textContent = "체감 테스트 다시";
   $("#btnTest").classList.add("on");
