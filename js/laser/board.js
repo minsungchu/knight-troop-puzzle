@@ -44,14 +44,15 @@ export class LaserBoard {
        관찰자는 변수에 붙들어 둬야 한다 — new ResizeObserver(...).observe(...) 로
        쓰면 참조가 남지 않아 콜백이 한 번 돌기도 전에 수거된다. */
     this.lastRoom = 0;
+    this.room = host.parentElement || host;
     this.watch = new ResizeObserver(() => {
-      const room = Math.round(host.clientWidth);
+      const room = Math.round(this.room.clientWidth);
       if (!this.board || room === this.lastRoom) return;
       this.lastRoom = room;
       this.fit();
       this.render();
     });
-    this.watch.observe(host);
+    this.watch.observe(this.room);
   }
 
   destroy() { this.watch.disconnect(); }
@@ -99,7 +100,10 @@ export class LaserBoard {
      테두리·글자는 모두 --cell 에 비례하므로 여기만 정하면 따라온다. */
   fit() {
     const W = this.board.W;
-    const room = this.host.clientWidth;
+    /* 판 자신이 아니라 판이 놓인 자리를 잰다. 판은 flex 항목이라 폭이 내용에 맞춰
+       줄어드는데, 그 내용(칸 크기)을 여기서 정한다 — 자신을 재면 닭과 달걀이 되어
+       늘 최소 칸(18px)으로 굳는다. */
+    const room = (this.host.parentElement || this.host).clientWidth;
     const narrow = room < 420;
     const gap = narrow ? 3 : 4;
     const plinth = narrow ? 10 : 18;
