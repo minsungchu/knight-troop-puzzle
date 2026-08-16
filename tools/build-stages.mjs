@@ -13,7 +13,7 @@
  */
 
 import { makePuzzle, solve, trace, targetsOf, at, EMPTY } from "../js/laser/engine.js";
-import { writeFileSync, mkdirSync } from "node:fs";
+import { writeFileSync, readFileSync, mkdirSync, existsSync } from "node:fs";
 
 /* ── 익힘 구간 (1~20) ────────────────────────────────────────────────
    한 단계에 하나씩만 새로 들여온다. 붙박이 거울은 중반에 들어온다. */
@@ -45,20 +45,6 @@ const TUTORIAL = [
   { n: 18, W: 7, mirrors: 5, walls: 5, splitters: 1, targets: 2, fixed: 1 },
   { n: 19, W: 7, mirrors: 5, walls: 5, splitters: 1, targets: 3, fixed: 1 },
   { n: 20, W: 7, mirrors: 6, walls: 5, splitters: 1, targets: 3, fixed: 1 },
-];
-
-/* ── 본 구간 (21~100) 후보 사양 ──────────────────────────────────────
-   점수는 사양이 아니라 판마다 크게 갈리므로, 사양별로 많이 만들어 통에 넣고
-   나중에 점수로 뽑는다. 어려운 사양은 수율이 낮아 시간을 더 준다. */
-const POOL_SPECS = [
-  { W: 6, mirrors: 4, walls: 3, splitters: 1, targets: 2, fixed: 1, want: 60, ms: 20000 },
-  { W: 7, mirrors: 4, walls: 4, splitters: 1, targets: 2, fixed: 1, want: 80, ms: 20000 },
-  { W: 7, mirrors: 5, walls: 5, splitters: 1, targets: 2, fixed: 1, want: 80, ms: 30000 },
-  { W: 7, mirrors: 5, walls: 5, splitters: 2, targets: 3, fixed: 2, want: 60, ms: 30000 },
-  { W: 7, mirrors: 6, walls: 5, splitters: 1, targets: 3, fixed: 1, want: 80, ms: 40000 },
-  { W: 7, mirrors: 6, walls: 6, splitters: 2, targets: 3, fixed: 2, want: 60, ms: 40000 },
-  { W: 8, mirrors: 6, walls: 6, splitters: 2, targets: 3, fixed: 1, want: 60, ms: 40000 },
-  { W: 8, mirrors: 7, walls: 7, splitters: 2, targets: 3, fixed: 2, want: 60, ms: 60000 },
 ];
 
 /** 한 사양으로 판을 만들어 낸다. 씨앗을 바꿔 가며 될 때까지. */
@@ -139,39 +125,32 @@ for (const t of TUTORIAL) {
   stages.push(pack(pick, t.n, t.teach));
 }
 
-console.log("본 구간 후보 만드는 중 …");
-const pool = [];
-for (const spec of POOL_SPECS) {
-  const st = Date.now();
-  let made = 0;
-  for (let i = 0; i < spec.want * 40 && made < spec.want; i++) {
-    if (Date.now() - st > spec.ms) break;
-    const p = make(spec, (i * 104729 + spec.W * 31 + spec.mirrors * 7) | 0, 1500);
-    if (!p) continue;
-    const bad = verify(p);
-    if (bad) { problems.push(`후보 ${spec.W}×${spec.W} m${spec.mirrors}: ${bad}`); continue; }
-    pool.push(p); made++;
-  }
-  const s = pool.slice(-made).map((p) => p.score).sort((a, b) => a - b);
-  console.log(`  ${spec.W}×${spec.W} 거울${spec.mirrors}: ${made}판, 점수 ${s[0]}~${s[s.length - 1]} (${((Date.now() - st) / 1000).toFixed(1)}초)`);
+/* 본 구간 후보는 tools/grow-pool.mjs 가 쌓아 둔 통에서 가져온다.
+   큰 판은 하나에 수십 초가 걸려서, 단계를 다시 배정할 때마다 새로 만들 수 없다. */
+const poolFile = new URL("../data/laser-pool.json", import.meta.url);
+if (!existsSync(poolFile)) {
+  console.error("후보 통이 없습니다. 먼저 `node tools/grow-pool.mjs 25` 를 돌리세요.");
+  process.exit(1);
 }
+const pool = JSON.parse(readFileSync(poolFile));
+pool.sort((a, b) => a.score - b.score);
+console.log(`후보 통 ${pool.length}판, 점수 ${pool[0].score}~${pool[pool.length - 1].score}`);
 
 /* 21~100 단계 배정.
-   그냥 분위로 자르면 통에 흔한 점수대(가운데)가 단계 대부분을 먹고, 곡선이 평평해진다.
-   대신 목표 곡선을 먼저 그린다 — 익힘 구간이 끝난 점수에서 시작해 통의 위쪽까지
-   올라가는 선이다. 그리고 각 단계마다 목표에 가장 가까운 판을 하나씩 빼서 쓴다. */
+   그냥 분위로 자르면 통에 흔한 점수대(가운데)가 단계 대부분을 먹고 곡선이 평평해진다.
+   대신 목표 곡선을 먼저 그리고, 각 단계마다 목표에 가장 가까운 판을 하나씩 빼서 쓴다. */
 const NEED = 100 - TUTORIAL.length;
 const tutorTop = Math.max(...stages.map((s) => s.score));
-pool.sort((a, b) => a.score - b.score);
 if (pool.length < NEED) problems.push(`후보가 ${pool.length}판뿐 — ${NEED}판이 필요하다`);
 
 // 끝점은 통에서 가장 어려운 판이다. 100단계가 실제로 가장 어려워야 한다.
-const top = pool.length ? pool[pool.length - 1].score : tutorTop;
+const top = pool[pool.length - 1].score;
 const used = new Array(pool.length).fill(false);
 for (let i = 0; i < NEED; i++) {
   const f = i / (NEED - 1);
-  // 뒤로 갈수록 가팔라지게 — 앞부분이 평평해 보이는 걸 막는다
-  const target = tutorTop + (top - tutorTop) * (0.55 * f + 0.45 * f * f);
+  /* 앞은 빨리 오르고 뒤는 완만하게(f^0.75). 처음엔 반대로 그렸는데, 그러면 중반이
+     오래 평평해서 "190쯤은 별로 안 어렵다"는 구간이 스무 단계씩 이어진다. */
+  const target = tutorTop + (top - tutorTop) * Math.pow(f, 0.75);
   let best = -1, bestD = Infinity;
   for (let k = 0; k < pool.length; k++) {
     if (used[k]) continue;
@@ -180,7 +159,7 @@ for (let i = 0; i < NEED; i++) {
   }
   if (best < 0) break;
   used[best] = true;
-  stages.push(pack(pool[best], 21 + i));
+  stages.push({ ...pool[best], stage: 21 + i });
 }
 // 배정 뒤 점수 순으로 다시 매긴다 — 가장 가까운 판을 고르다 보면 순서가 흐트러진다
 const main = stages.splice(TUTORIAL.length).sort((a, b) => a.score - b.score);
