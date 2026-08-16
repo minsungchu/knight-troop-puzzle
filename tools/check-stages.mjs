@@ -6,7 +6,7 @@
  * 정말 풀리는지 · 답이 하나뿐인지 · 거울을 덜 쓰고 클리어되지 않는지 확인한다.
  */
 
-import { solve, makeBoard, setSource, targetsOf, TARGET } from "../prototypes/laser-engine.js";
+import { solve, makeBoard, setSource, targetsOf, TARGET } from "../js/laser/engine.js";
 import { readFileSync } from "node:fs";
 
 const { stages } = JSON.parse(readFileSync(new URL("../data/laser-stages.json", import.meta.url)));

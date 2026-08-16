@@ -12,7 +12,7 @@
  * 사람이 푼 시간 6.6초 / 170.5초였다).
  */
 
-import { makePuzzle, solve, trace, targetsOf, at, EMPTY } from "../prototypes/laser-engine.js";
+import { makePuzzle, solve, trace, targetsOf, at, EMPTY } from "../js/laser/engine.js";
 import { writeFileSync, mkdirSync } from "node:fs";
 
 /* ── 익힘 구간 (1~20) ────────────────────────────────────────────────

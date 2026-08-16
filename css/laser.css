@@ -1,0 +1,97 @@
+/* 레이저 미로 — 판과 등반 지도 */
+
+.lz-stage{display:flex; justify-content:center; padding:22px 0 8px; perspective:1400px}
+.lz-board{position:relative; transform:rotateX(14deg); transform-style:preserve-3d;
+  --cell:56px; --gap:4px; --plinth:18px}
+.lz-plinth{position:absolute; inset:calc(var(--plinth) * -1); border-radius:12px; transform:translateZ(-14px);
+  background:linear-gradient(160deg,#1b2b42,#0d1626 60%); border:1px solid rgba(201,151,63,.3);
+  box-shadow:0 36px 64px rgba(0,0,0,.62), inset 0 0 60px rgba(0,0,0,.5)}
+
+/* 칸 사이를 gap 으로 벌리면 그 띠가 아무에게도 속하지 않아 커서가 깜빡이고
+   누른 것이 먹지 않는다. 칸은 붙이고 보이는 타일만 ::before 로 안쪽에 그린다. */
+.lz-grid{display:grid; gap:0; position:relative}
+.lz-cell{width:var(--cell); height:var(--cell); position:relative; cursor:pointer;
+  display:flex; align-items:center; justify-content:center}
+.lz-cell::before{content:""; position:absolute; inset:calc(var(--gap) / 2); border-radius:6px;
+  background:linear-gradient(150deg,#2d4159,#23344b);
+  box-shadow:0 1px 0 #1a2637,0 3px 0 #131d29,0 6px 10px rgba(0,0,0,.5);
+  transition:filter .13s, box-shadow .13s}
+.lz-cell > *{position:relative; pointer-events:none}
+.lz-cell:hover::before{filter:brightness(1.35)}   /* 칸을 움직이지 않는다 */
+
+.lz-cell.wall{cursor:default}
+.lz-cell.wall::before{background:linear-gradient(150deg,#171d27,#0d1117); box-shadow:inset 0 0 14px rgba(0,0,0,.8)}
+.lz-cell.fixed{cursor:default}
+.lz-cell.wall:hover::before, .lz-cell.fixed:hover::before{filter:none}
+.lz-cell.pinned::before{background:linear-gradient(150deg,#33405a,#1d2738);
+  box-shadow:0 0 0 1px rgba(223,233,245,.4) inset, 0 3px 0 #131d29}
+.lz-cell.target::before{background:linear-gradient(150deg,#2a1c2e,#1a1220)}
+.lz-cell.target.lit::before{background:linear-gradient(150deg,#1c4636,#123024);
+  box-shadow:0 0 22px -2px #6fe3b0, 0 3px 0 #0a1119}
+
+.lz-mark{font-family:var(--mono,ui-monospace,Menlo,monospace); font-size:calc(var(--cell)*.5);
+  line-height:1; user-select:none}
+.lz-mark.mirror{color:#dfe9f5; text-shadow:0 0 10px rgba(255,255,255,.55),0 2px 3px #000}
+.lz-mark.split{color:#b98cf0; text-shadow:0 0 12px rgba(185,140,240,.8)}
+
+.lz-t{display:block; width:calc(var(--cell)*.42); height:calc(var(--cell)*.42);
+  border:max(2px, calc(var(--cell)*.055)) solid #e0576d}
+.lz-t.c0{border-radius:50%}
+.lz-t.c1{border-radius:3px; transform:rotate(45deg)}
+.lz-cell.target.lit .lz-t{border-color:#6fe3b0; box-shadow:0 0 16px #6fe3b0}
+
+/* 광원은 판 바깥 좌표라 격자 밖에 얹힌다 */
+.lz-emit{position:absolute; width:var(--cell); height:var(--cell); border-radius:6px;
+  display:flex; align-items:center; justify-content:center; pointer-events:none;
+  background:linear-gradient(150deg,#6b4d18,#2e2008); border:1px solid rgba(224,180,92,.8);
+  box-shadow:0 0 30px -4px var(--brass), 0 3px 0 #0a1119}
+.lz-arrow{font-size:calc(var(--cell)*.42); line-height:1; color:#ffe6ae; text-shadow:0 0 10px var(--brass)}
+
+/* 발광은 선을 겹쳐서 낸다. 굵기는 칸 크기에 비례해야 좁은 화면에서 칸을 덮지 않는다. */
+.lz-beam{position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible}
+.bm-halo{stroke:#ffd98a; stroke-width:calc(var(--cell)*.25); stroke-linecap:round; opacity:.10}
+.bm-mid{stroke:#ffd98a; stroke-width:calc(var(--cell)*.125); stroke-linecap:round; opacity:.22}
+.bm-core{stroke:#fff6df; stroke-width:calc(var(--cell)*.047); stroke-linecap:round; opacity:.95}
+
+/* ══════════════ 단계 화면 ══════════════ */
+.lz-goal{margin-top:14px; padding:10px 14px; border-radius:8px; font-size:13.5px; line-height:1.6;
+  background:rgba(23,38,58,.7); border:1px solid rgba(201,151,63,.3)}
+.lz-goal b{color:var(--brass); font-variant-numeric:tabular-nums}
+.lz-goal .ok{color:#6fe3b0}
+.lz-goal .no{color:#e0576d}
+.lz-teach{margin-top:10px; padding:9px 13px; border-radius:8px; font-size:13px;
+  background:rgba(201,151,63,.12); border:1px solid rgba(201,151,63,.45); color:#f0e2c4}
+
+.lz-bar{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:14px}
+.lz-head{display:flex; flex-wrap:wrap; gap:8px 20px; align-items:baseline; margin-top:6px;
+  font-size:12.5px; color:var(--mist)}
+.lz-head b{font-family:var(--mono,ui-monospace,Menlo,monospace); color:var(--parch);
+  margin-left:6px; font-variant-numeric:tabular-nums}
+
+.lz-done{max-width:560px; margin:14px auto 0; padding:14px 18px; border-radius:10px; text-align:center;
+  background:rgba(18,48,36,.9); border:1px solid rgba(111,227,176,.6); font-size:14px; line-height:1.8}
+.lz-done b{color:#6fe3b0}
+
+/* ══════════════ 등반 지도 ══════════════ */
+.lz-map-wrap{position:relative; margin-top:16px; border-radius:12px; overflow:hidden;
+  border:1px solid rgba(201,151,63,.24);
+  background:linear-gradient(#0d1626 0%, #101d31 45%, #16283f 100%)}
+/* viewBox 좌표를 픽셀과 1:1 로 두고, 좁은 화면에서만 줄인다 */
+.lz-map{display:block; margin:0 auto; max-width:100%; height:auto}
+
+.lz-node{cursor:pointer}
+.lz-node .ring{fill:#1b2b42; stroke:rgba(201,151,63,.35); stroke-width:1.5}
+.lz-node .num{font-family:var(--mono,ui-monospace,Menlo,monospace); font-size:12px;
+  fill:#7f92ab; text-anchor:middle; dominant-baseline:central; user-select:none}
+.lz-node.done .ring{fill:#1c4636; stroke:#6fe3b0}
+.lz-node.done .num{fill:#c9f2df}
+.lz-node.now .ring{fill:#6b4d18; stroke:#e0b45c; stroke-width:2.5}
+.lz-node.now .num{fill:#ffe6ae; font-weight:700}
+.lz-node.lock{cursor:not-allowed; opacity:.45}
+.lz-node:not(.lock):hover .ring{stroke:var(--brass); stroke-width:2.5}
+
+.lz-summit{font-family:var(--display); font-size:17px; fill:#f0d69c; text-anchor:middle;
+  letter-spacing:.1em}
+.lz-progress{display:flex; flex-wrap:wrap; gap:8px 18px; align-items:center; margin-top:12px;
+  font-size:13px; color:var(--mist)}
+.lz-progress b{color:var(--parch); font-family:var(--mono,ui-monospace,Menlo,monospace)}

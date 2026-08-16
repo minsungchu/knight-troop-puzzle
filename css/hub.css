@@ -1,0 +1,40 @@
+/* 게임 고르는 첫 화면 */
+
+.hub{
+  display:grid; gap:18px; margin-top:26px;
+  grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.game-card{
+  display:flex; gap:18px; align-items:center; text-decoration:none; color:inherit;
+  padding:20px; border-radius:14px;
+  background:linear-gradient(150deg, rgba(29,44,67,.92), rgba(15,23,36,.92));
+  border:1px solid rgba(201,151,63,.28);
+  box-shadow:0 18px 38px rgba(0,0,0,.5);
+  transition:border-color .15s, transform .15s, box-shadow .15s;
+}
+.game-card:hover{
+  border-color:rgba(201,151,63,.7);
+  transform:translateY(-3px);
+  box-shadow:0 24px 48px rgba(0,0,0,.6);
+}
+.game-card:focus-visible{outline:2px solid var(--brass); outline-offset:3px}
+
+.game-art{width:108px; height:108px; flex:none; border-radius:10px}
+.game-text h2{font-family:var(--display); font-size:19px; margin:0 0 6px; color:var(--parch)}
+.game-text p{margin:0; font-size:13px; line-height:1.7; color:var(--mist)}
+
+.game-tags{display:flex; flex-wrap:wrap; gap:6px; margin-top:10px}
+.game-tags span{
+  font-size:10.5px; letter-spacing:.06em; padding:3px 9px; border-radius:99px;
+  color:var(--brass); border:1px solid rgba(201,151,63,.4);
+}
+
+/* 좁은 화면에서는 그림을 위로 올린다 — 옆으로 붙이면 글이 두세 글자씩 끊긴다 */
+@media (max-width:420px){
+  .game-card{flex-direction:column; align-items:flex-start; gap:14px}
+  .game-art{width:88px; height:88px}
+}
+
+/* 각 게임 화면에서 첫 화면으로 돌아가는 단추 */
+.tab-home{text-decoration:none; display:inline-flex; align-items:center}

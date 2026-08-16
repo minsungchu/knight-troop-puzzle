@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>레이저 미로 — 등반</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/theme.css">
+<link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/hub.css">
+<link rel="stylesheet" href="css/laser.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="masthead">
+    <div class="brand">
+      <h1>레이저 미로</h1>
+      <div class="sub">LASER MAZE · 100 STAGES</div>
+    </div>
+
+    <nav class="tabs" role="tablist" aria-label="화면 전환">
+      <a class="tab tab-home" href="./" aria-label="게임 고르기로">◂ 게임</a>
+      <button class="tab on" data-tab="climb" role="tab" aria-selected="true">등반</button>
+      <button class="tab" data-tab="versus" role="tab" aria-selected="false">대전</button>
+    </nav>
+
+    <div class="account" id="account"></div>
+  </header>
+
+  <!-- ══════════════ 등반 ══════════════ -->
+  <section class="view" data-view="climb">
+
+    <!-- 지도 -->
+    <div id="lzMap">
+      <div class="lz-progress" id="lzProgress"></div>
+      <div class="lz-map-wrap" id="lzMapBody" style="max-height:min(70vh,620px); overflow-y:auto"></div>
+      <p class="hint">깬 단계는 다시 들어갈 수 있습니다. 기록은 더 빠를 때만 바뀝니다.</p>
+    </div>
+
+    <!-- 한 단계 -->
+    <div id="lzPlay" hidden>
+      <div class="lz-bar">
+        <button id="lzToMap">◂ 지도</button>
+        <strong id="lzTitle" style="font-family:var(--display); font-size:17px"></strong>
+        <span style="flex:1"></span>
+        <button id="lzUndo">되돌리기</button>
+        <button id="lzClear">전부 치우기</button>
+        <button id="lzRetry">처음부터</button>
+      </div>
+
+      <div class="lz-teach" id="lzTeach" hidden></div>
+      <div class="lz-goal" id="lzGoal"></div>
+      <div class="lz-head">
+        <span>경과<b id="lzTime">0.0초</b></span>
+        <span id="lzBest"></span>
+      </div>
+
+      <div class="lz-stage"><div class="lz-board" id="lzBoard"></div></div>
+      <div class="lz-done" id="lzDone" hidden></div>
+
+      <div class="panel">
+        <h2>규칙</h2>
+        <div class="hint">
+          <b>빛</b>은 판 <b>바깥</b>에 붙은 황금색 발사구에서 화살표 방향으로 들어와, 거울에 부딪힐 때까지 직진합니다.<br>
+          <b>거울</b>은 빈 칸을 눌러 <b>／</b> → <b>＼</b> → 없음 순서로 바꿉니다.<br>
+          <b>성공 조건은 둘 다</b>입니다 — 주어진 거울을 <b>하나도 남기지 않고</b> 놓고, <b>모든 목표</b>에 빛이 닿아야 합니다.<br>
+          <b>테두리가 밝은 흰 거울</b>은 <b>붙박이</b>라 옮길 수 없고, 세는 개수에도 들어가지 않습니다.<br>
+          <b>분광기</b>(보라색 ／＼)는 빛을 <b>둘로 가릅니다</b> — 직진분과 반사분이 함께 갑니다.<br>
+          <b>벽</b>(검은 칸)은 빛을 삼킵니다. 판 밖으로 나간 빛도 사라집니다.<br>
+          판마다 <b>답은 하나뿐</b>이고, 거울을 덜 쓰고 클리어되는 지름길은 없습니다.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════ 대전 ══════════════ -->
+  <section class="view" data-view="versus" hidden>
+    <div class="panel">
+      <h2>대전</h2>
+      <div class="hint">아직 준비 중입니다. 등반을 먼저 마무리하고 붙입니다.</div>
+    </div>
+  </section>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="veil" id="veil"><div class="card" id="card"></div></div>
+
+<script type="module" src="js/laser/main.js"></script>
+</body>
+</html>
