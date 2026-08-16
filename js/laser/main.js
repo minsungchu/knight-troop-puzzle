@@ -3,6 +3,7 @@ import { $$, showTab } from "../ui.js";
 import * as Auth from "../auth.js";
 import * as Sfx from "../sound.js";
 import * as Solo from "./solo.js";
+import * as Versus from "./versus.js";
 
 $$(".tab[data-tab]").forEach((b) => { b.onclick = () => showTab(b.dataset.tab); });
 
@@ -13,6 +14,7 @@ Sfx.listenForGesture();
 Auth.init();
 Solo.bind();
 Solo.init();
+Versus.init();
 
 // 로그인하면 서버 진행과 합쳐지므로 지도를 다시 그린다
 document.addEventListener("laser-progress", () => Solo.refresh());
