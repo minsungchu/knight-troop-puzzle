@@ -47,7 +47,7 @@ async function pull() {
   if (syncing) return syncing;
   syncing = (async () => {
     try {
-      const { data, error } = await client().rpc("laser_progress_get");
+      const { data, error } = await (await client()).rpc("laser_progress_get");
       if (error) throw error;
       const server = new Map((data || []).map((r) => [r.stage, r.best_ms]));
       const merged = merge(times, server);
@@ -67,7 +67,7 @@ async function pull() {
 async function push(stage, ms) {
   if (!ONLINE || !uid()) return;
   try {
-    const { error } = await client().rpc("laser_progress_set", { p_stage: stage, p_ms: ms });
+    const { error } = await (await client()).rpc("laser_progress_set", { p_stage: stage, p_ms: ms });
     if (error) throw error;
   } catch (e) { console.warn("진행 저장 실패", e); }
 }

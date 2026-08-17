@@ -13,7 +13,8 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 
 const OUT = new URL("../data/laser-pool.json", import.meta.url);
 const minutes = Number(process.argv[2]) || 10;
-/** `node tools/grow-pool.mjs 30 hard` — 어려운 사양(8×8 이상)만 불린다. */
+/** `node tools/grow-pool.mjs 30 hard` — hard 표시가 붙은 사양만 불린다.
+    판 크기로 가르지 않는다 — 어려움을 정하는 건 크기가 아니라 거울 밀도다. */
 const onlyHard = process.argv[3] === "hard";
 
 /* 어려운 쪽이 모자라므로 큰 판에 시간을 더 준다. weight 는 시간 배분 비율이다.
@@ -31,10 +32,10 @@ const SPECS = [
   { W: 6, mirrors: 8, walls: 3, splitters: 1, targets: 2, fixed: 1, weight: 4 },
   { W: 7, mirrors: 6, walls: 4, splitters: 1, targets: 2, fixed: 1, weight: 3 },
   { W: 7, mirrors: 7, walls: 4, splitters: 2, targets: 3, fixed: 1, weight: 4 },
-  { W: 7, mirrors: 8, walls: 4, splitters: 2, targets: 3, fixed: 2, weight: 6 },
-  { W: 7, mirrors: 9, walls: 4, splitters: 2, targets: 3, fixed: 2, weight: 8 },
-  { W: 8, mirrors: 9, walls: 5, splitters: 2, targets: 3, fixed: 1, weight: 8 },
-  { W: 8, mirrors: 10, walls: 5, splitters: 2, targets: 3, fixed: 1, weight: 10 },
+  { W: 7, mirrors: 8, walls: 4, splitters: 2, targets: 3, fixed: 2, weight: 6, hard: true },
+  { W: 7, mirrors: 9, walls: 4, splitters: 2, targets: 3, fixed: 2, weight: 8, hard: true },
+  { W: 8, mirrors: 9, walls: 5, splitters: 2, targets: 3, fixed: 1, weight: 8, hard: true },
+  { W: 8, mirrors: 10, walls: 5, splitters: 2, targets: 3, fixed: 1, weight: 10, hard: true },
 ];
 
 /* 빛이 판을 이만큼은 써야 담는다. 답이 하나여도 한쪽 구석만 오가면 나머지는
@@ -79,7 +80,7 @@ const totalWeight = SPECS.reduce((s, x) => s + x.weight, 0);
 const t0 = Date.now();
 let added = 0, rejected = 0;
 
-const active = onlyHard ? SPECS.filter((s) => s.W >= 8) : SPECS;
+const active = onlyHard ? SPECS.filter((s) => s.hard) : SPECS;
 const activeWeight = active.reduce((s, x) => s + x.weight, 0);
 for (const spec of active) {
   const budget = (minutes * 60000 * spec.weight) / activeWeight;

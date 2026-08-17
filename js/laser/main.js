@@ -1,9 +1,10 @@
 /* 레이저 미로 진입점 */
-import { $$, showTab } from "../ui.js";
+import { $$, showTab, onTab } from "../ui.js";
 import * as Auth from "../auth.js";
 import * as Sfx from "../sound.js";
 import * as Solo from "./solo.js";
 import * as Versus from "./versus.js";
+import * as Rank from "./rank.js";
 
 $$(".tab[data-tab]").forEach((b) => { b.onclick = () => showTab(b.dataset.tab); });
 
@@ -15,6 +16,10 @@ Auth.init();
 Solo.bind();
 Solo.init();
 Versus.init();
+Rank.init();
+
+// 급수 탭은 열 때 불러온다 — 안 보는 화면을 미리 채울 이유가 없다
+onTab((name) => { if (name === "rank") Rank.render(); });
 
 // 로그인하면 서버 진행과 합쳐지므로 지도를 다시 그린다
 document.addEventListener("laser-progress", () => Solo.refresh());

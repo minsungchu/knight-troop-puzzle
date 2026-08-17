@@ -79,8 +79,12 @@ grant select on public.laser_open_rooms to anon, authenticated;
 
 /* ══════════════ 함수 ══════════════ */
 
-/* jsonb 로 돌려준다. returns table (id, code) 로 두면 그 출력 이름이 레코드의
-   r.id · r.code 와 부딪혀 "column reference id is ambiguous" 로 죽는다. */
+/* jsonb 로 돌려준다.
+   returns table (id uuid, code text) 로 두면 plpgsql 이 id · code 라는 변수를 만드는데,
+   그 이름이 laser_rooms 의 열 이름과 같다. 그래서 아래
+     exit when not exists (select 1 from public.laser_rooms where code = c);
+   의 code 가 열인지 변수인지 갈리지 않아 "column reference is ambiguous" 로 죽는다.
+   출력 이름을 없애면 그 충돌 자체가 사라진다. */
 create or replace function public.laser_room_create(
   p_title text, p_private boolean, p_join_code text,
   p_max int, p_low int, p_mid int, p_high int

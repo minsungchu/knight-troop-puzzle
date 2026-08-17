@@ -38,7 +38,7 @@ export async function init() {
 async function loadRating() {
   if (!ONLINE || !uid()) { myRating = BASE; return; }
   try {
-    const { data } = await client().rpc("laser_my_rating");
+    const { data } = await (await client()).rpc("laser_my_rating");
     if (data) { myRating = data.rating; paintRating(data); }
   } catch { /* 급수는 없어도 대전은 된다 */ }
 }
@@ -63,7 +63,7 @@ export async function renderLobby() {
 
   let rooms = [];
   try {
-    const { data, error } = await client().from("laser_open_rooms").select("*");
+    const { data, error } = await (await client()).from("laser_open_rooms").select("*");
     if (error) throw error;
     rooms = data || [];
   } catch (e) { console.warn(e); }
@@ -136,7 +136,7 @@ function openCreate() {
   $("#cGo").onclick = async () => {
     const priv = $("#cPriv").checked;
     try {
-      const { data, error } = await client().rpc("laser_room_create", {
+      const { data, error } = await (await client()).rpc("laser_room_create", {
         p_title: $("#cTitle").value, p_private: priv,
         p_join_code: priv ? $("#cPass").value : null,
         p_max: +$("#cMax").value,
@@ -160,7 +160,7 @@ function openJoin(code) {
 
 async function join(code, pass) {
   try {
-    const { data, error } = await client().rpc("laser_room_join", { p_code: code, p_pass: pass || null });
+    const { data, error } = await (await client()).rpc("laser_room_join", { p_code: code, p_pass: pass || null });
     if (error) throw error;
     hideVeil();
     await enter(data);
@@ -172,7 +172,7 @@ async function join(code, pass) {
 async function enter(id) {
   room = { id };
   await refresh();
-  openChannel(id);
+  await openChannel(id);
   clearInterval(poll);
   // 실시간이 끊겨도 방이 멈추지 않도록, 느슨하게 다시 확인한다
   poll = setInterval(refresh, 4000);
@@ -181,7 +181,7 @@ async function enter(id) {
 async function refresh() {
   if (!room) return;
   try {
-    const { data, error } = await client().rpc("laser_room_state", { p_room: room.id });
+    const { data, error } = await (await client()).rpc("laser_room_state", { p_room: room.id });
     if (error) throw error;
     const was = room.status;
     room = { ...data, id: data.id };
@@ -194,9 +194,9 @@ async function refresh() {
   }
 }
 
-function openChannel(id) {
+async function openChannel(id) {
   closeChannel();
-  channel = client().channel(`laser-room-${id}`, { config: { presence: { key: uid() } } });
+  channel = (await client()).channel(`laser-room-${id}`, { config: { presence: { key: uid() } } });
   channel.on("broadcast", { event: "state" }, () => refresh());
   channel.on("broadcast", { event: "progress" }, ({ payload }) => {
     if (!room?.players) return;
@@ -263,7 +263,7 @@ function drawBoards() {
 async function start() {
   try {
     const picked = drawBoards();
-    const { error } = await client().rpc("laser_room_start", {
+    const { error } = await (await client()).rpc("laser_room_start", {
       p_room: room.id, p_boards: JSON.stringify(picked),
     });
     if (error) throw error;
@@ -351,7 +351,7 @@ function paintScoreboard() {
 async function onBoardWin() {
   Sfx.win?.();
   idx++;
-  try { await client().rpc("laser_room_progress", { p_room: room.id, p_solved: idx }); } catch {}
+  try { await (await client()).rpc("laser_room_progress", { p_room: room.id, p_solved: idx }); } catch {}
   shout("progress", { id: uid(), solved: idx });
 
   if (idx < boards.length) {
@@ -366,7 +366,7 @@ async function onBoardWin() {
   const ms = Math.round(performance.now() - startedAt);
   let deltas = [];
   try {
-    const { data } = await client().rpc("laser_room_finish", { p_room: room.id, p_ms: ms });
+    const { data } = await (await client()).rpc("laser_room_finish", { p_room: room.id, p_ms: ms });
     deltas = data || [];
   } catch (e) { console.warn(e); }
   shout("state");
@@ -389,7 +389,7 @@ function showResult(ms, deltas) {
 /* ══════════════ 나가기 ══════════════ */
 
 async function leave() {
-  try { await client().rpc("laser_room_leave", { p_room: room.id }); } catch {}
+  try { await (await client()).rpc("laser_room_leave", { p_room: room.id }); } catch {}
   shout("state");
   leaveLocal();
 }
