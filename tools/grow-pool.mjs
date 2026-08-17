@@ -21,18 +21,26 @@ const onlyHard = process.argv[3] === "hard";
    한 번 조일 때마다 너무 오래 걸려 40초에 한 판도 못 만든다. 표본을 줄이고 한도를
    낮추면 같은 시간에 세 판이 나오고, 점수도 오히려 높다(139 → 중앙 267). */
 const SPECS = [
-  { W: 6, mirrors: 4, walls: 3, splitters: 1, targets: 2, fixed: 1, weight: 1 },
-  { W: 7, mirrors: 4, walls: 4, splitters: 1, targets: 2, fixed: 1, weight: 1 },
-  { W: 7, mirrors: 5, walls: 5, splitters: 1, targets: 2, fixed: 1, weight: 2 },
-  { W: 7, mirrors: 6, walls: 5, splitters: 1, targets: 3, fixed: 1, weight: 3 },
-  { W: 8, mirrors: 6, walls: 6, splitters: 2, targets: 3, fixed: 1, weight: 3 },
-  { W: 8, mirrors: 7, walls: 7, splitters: 2, targets: 3, fixed: 2, weight: 5 },
-  { W: 8, mirrors: 8, walls: 8, splitters: 2, targets: 3, fixed: 2, weight: 6 },
-  { W: 9, mirrors: 8, walls: 9, splitters: 2, targets: 3, fixed: 2, weight: 8 , opts: { sampleSolutions: 16, nodeLimit: 1500000 } },
-  { W: 9, mirrors: 9, walls: 10, splitters: 3, targets: 4, fixed: 2, weight: 8 , opts: { sampleSolutions: 16, nodeLimit: 1500000 } },
-  { W: 9, mirrors: 10, walls: 10, splitters: 3, targets: 4, fixed: 2, weight: 8 , opts: { sampleSolutions: 16, nodeLimit: 1500000 } },
-  { W: 10, mirrors: 10, walls: 12, splitters: 3, targets: 4, fixed: 2, weight: 8 , opts: { sampleSolutions: 12, nodeLimit: 1200000 } },
+  // 판 크기보다 거울 밀도가 커버리지를 정한다. 9×9 에 거울 8개는 판의 28% 만 쓰지만
+  // 7×7 에 거울 9개는 49%, 8×8 에 거울 10개는 44% 를 쓴다. 점수는 비슷하다.
+  // 여유(fixed)는 사양마다 다르다 — 조이기가 박을 몫인데, 많이 두면 생성이 어려워져
+  // 오히려 수율이 떨어진다. 사양별로 재서 가장 잘 나오는 값을 넣었다.
+  { W: 5, mirrors: 3, walls: 1, splitters: 0, targets: 1, fixed: 0, weight: 1 },
+  { W: 6, mirrors: 4, walls: 2, splitters: 1, targets: 2, fixed: 1, weight: 1 },
+  { W: 6, mirrors: 6, walls: 3, splitters: 1, targets: 2, fixed: 1, weight: 2 },
+  { W: 6, mirrors: 8, walls: 3, splitters: 1, targets: 2, fixed: 1, weight: 4 },
+  { W: 7, mirrors: 6, walls: 4, splitters: 1, targets: 2, fixed: 1, weight: 3 },
+  { W: 7, mirrors: 7, walls: 4, splitters: 2, targets: 3, fixed: 1, weight: 4 },
+  { W: 7, mirrors: 8, walls: 4, splitters: 2, targets: 3, fixed: 2, weight: 6 },
+  { W: 7, mirrors: 9, walls: 4, splitters: 2, targets: 3, fixed: 2, weight: 8 },
+  { W: 8, mirrors: 9, walls: 5, splitters: 2, targets: 3, fixed: 1, weight: 8 },
+  { W: 8, mirrors: 10, walls: 5, splitters: 2, targets: 3, fixed: 1, weight: 10 },
 ];
+
+/* 빛이 판을 이만큼은 써야 담는다. 답이 하나여도 한쪽 구석만 오가면 나머지는
+   장식이고, 생각할 범위가 좁아 쉽게 느껴진다. */
+const MIN_COVER = 0.38;
+
 
 /** 저장한 판이 정말 풀리고, 답이 하나뿐이고, 지름길이 없는지 확인한다. */
 function verify(p) {
@@ -58,6 +66,7 @@ const pack = (p) => ({
   targets: p.targets,
   nodes: p.nodes,
   score: p.score,
+  cover: p.cover,
   seed: p.seed,
 });
 
@@ -78,7 +87,8 @@ for (const spec of active) {
   let made = 0, tries = 0;
   while (Date.now() - st < budget) {
     tries++;
-    const p = makePuzzle({ ...spec, H: spec.W }, (Date.now() * 31 + tries * 7919 + spec.W * 104729) | 0, spec.opts || {});
+    const p = makePuzzle({ ...spec, H: spec.W }, (Date.now() * 31 + tries * 7919 + spec.W * 104729) | 0,
+                         { ...(spec.opts || {}), minCover: MIN_COVER });
     if (!p) continue;
     const bad = verify(p);
     if (bad) { rejected++; continue; }
@@ -104,4 +114,6 @@ if (pool.length) {
   console.log(`점수 ${s[0]} ~ ${s[s.length - 1]} (25% ${q(0.25)}, 50% ${q(0.5)}, 75% ${q(0.75)}, 95% ${q(0.95)})`);
   const hard = s.filter((x) => x >= 200).length;
   console.log(`200점 이상 ${hard}판, 230점 이상 ${s.filter((x) => x >= 230).length}판`);
+  const cv = pool.map((p) => p.cover).filter((x) => x != null).sort((a, b) => a - b);
+  if (cv.length) console.log(`커버리지 중앙 ${(cv[cv.length >> 1] * 100).toFixed(0)}%, 최저 ${(cv[0] * 100).toFixed(0)}%`);
 }

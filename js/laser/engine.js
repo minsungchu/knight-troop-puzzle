@@ -216,8 +216,12 @@ export function solve(b, mirrorBudget, opts = {}) {
 
    해의 개수 항은 뺐다 — 이제 모든 판이 답 하나라서 상수였다.
    절대값에는 의미가 없다 — 판들을 줄 세우는 데만 쓴다. */
-export function difficulty({ nodes, mirrors }) {
-  return Math.round(Math.log2(nodes + 1) * 12 + mirrors * 4);
+export function difficulty({ nodes, mirrors, cover }) {
+  /* 빛이 판을 넓게 쓸수록 생각할 범위가 넓다. 이 항이 없으면 9×9 판의 정답이
+     65칸 중 13칸만 쓰면서도 249점을 받는 일이 생긴다 — 점수는 높은데 실제로는 쉽다.
+     cover 를 넘기지 않으면 (옛 자료를 다시 읽을 때) 이 항은 0 이 된다. */
+  const spread = cover == null ? 0 : (cover - 0.35) * 60;
+  return Math.round(Math.log2(nodes + 1) * 12 + mirrors * 4 + spread);
 }
 
 /* ══════════════ 생성 ══════════════
@@ -264,6 +268,7 @@ export function generate(spec, seed) {
   toPlace = mirrors;
   const queue = [{ x: b.src.x, y: b.src.y, dir: b.src.dir }];
   const seen = new Set();
+  const visited = new Set();          // 빛이 지난 칸 — 판을 넓게 쓰게 하는 데 쓴다
   let steps = 0;
 
   while (queue.length && steps < 4000) {
@@ -275,6 +280,7 @@ export function generate(spec, seed) {
       const key = `${x},${y},${dir}`;
       if (seen.has(key)) break;
       seen.add(key);
+      visited.add(`${x},${y}`);
 
       const c = at(b, x, y);
       if (c === WALL) { ends.push({ x: x - DX[dir], y: y - DY[dir] }); break; }
@@ -295,29 +301,39 @@ export function generate(spec, seed) {
         const nx = x + DX[dir], ny = y + DY[dir];
         const dying = !inside(b, nx, ny) || at(b, nx, ny) === WALL;
 
-        /** 그 방향으로 벽이나 판 끝에 닿기까지 몇 칸이 남았나 */
-        const room = (d) => {
-          let n = 0, cx2 = x, cy2 = y;
+        /** 그 방향으로 벽이나 판 끝에 닿기까지 몇 칸인지, 그중 아직 안 지난 칸은 몇 칸인지 */
+        const look = (d) => {
+          let n = 0, fresh = 0, cx2 = x, cy2 = y;
           for (;;) {
             cx2 += DX[d]; cy2 += DY[d];
-            if (!inside(b, cx2, cy2) || at(b, cx2, cy2) === WALL) return n;
+            if (!inside(b, cx2, cy2) || at(b, cx2, cy2) === WALL) return { n, fresh };
             n++;
+            if (!visited.has(`${cx2},${cy2}`)) fresh++;
           }
         };
 
+        /* 남은 길이만 보고 꺾으면 빛이 판의 한쪽 구석을 왕복하다 끝난다. 그러면 나머지
+           칸은 장식이 되고, 답이 하나뿐이어도 실제로 생각할 범위는 좁아 쉽게 느껴진다.
+           (고치기 전 9×9 판의 정답이 65칸 중 13칸만 쓰기도 했다.)
+           그래서 아직 지나지 않은 칸을 많이 지나는 쪽을 우선한다. */
         const turns = [MIRROR_SLASH, MIRROR_BACK]
           .map((m) => ({ m, d: m === MIRROR_SLASH ? REFLECT_SLASH(dir) : REFLECT_BACK(dir) }))
-          .map((t) => ({ ...t, room: room(t.d) }))
-          .filter((t) => t.room > 0)                    // 꺾어도 살아 있어야 의미가 있다
-          .sort((a, c) => c.room - a.room);             // 넓은 쪽을 앞에 둔다
+          .map((t) => ({ ...t, ...look(t.d) }))
+          .filter((t) => t.n > 0)                       // 꺾어도 살아 있어야 의미가 있다
+          .sort((a, c) => (c.fresh - a.fresh) || (c.n - a.n));
 
         /* 확률을 0.34 로 고정하면 남은 거울이 많을 때 빛이 먼저 판을 빠져나간다.
            7×7 에 거울 7개를 놓으려 하면 열에 아홉이 실패했다. 남은 거울이 많을수록
            자주 꺾고, 꺾을 때는 남은 길이 긴 쪽을 고른다. */
-        const urgency = Math.min(0.9, 0.22 + toPlace * 0.11);
+        let urgency = Math.min(0.9, 0.22 + toPlace * 0.11);
+
+        /* 그대로 가면 이미 지난 칸만 밟는데 꺾으면 새 칸이 나온다면, 꺾는 쪽으로 크게
+           기울인다. 이것이 없으면 빛이 같은 줄을 왕복하며 판을 좁게 쓴다. */
+        const ahead = look(dir);
+        if (turns.length && turns[0].fresh > ahead.fresh) urgency = Math.max(urgency, 0.85);
 
         if (turns.length && (dying || rnd() < urgency)) {
-          const pick = turns.length > 1 && rnd() < 0.3 ? turns[1] : turns[0];
+          const pick = turns.length > 1 && rnd() < 0.2 ? turns[1] : turns[0];
           placed.set(`${x},${y}`, pick.m);
           toPlace--;
           dir = pick.d;
@@ -511,6 +527,14 @@ export function makePuzzle(spec, seed, opts = {}) {
       if (solve(g.board, k, { maxSolutions: 1 }).solutions > 0) return null;
     }
   }
+  /* 정답의 빛이 판을 얼마나 쓰는지 잰다. 답이 하나여도 빛이 한쪽 구석만 오가면
+     나머지 칸은 장식이고, 실제로 생각할 범위가 좁아 쉽게 느껴진다.
+     · cover — 벽이 아닌 칸 가운데 빛이 지나는 칸의 비율
+     · box   — 빛이 닿는 칸을 감싸는 네모가 판에서 차지하는 비율 */
+  const cov = coverage(g.board, answer);
+  if (opts.minCover && cov.cover < opts.minCover) return null;
+  if (opts.minBox && cov.box < opts.minBox) return null;
+
   return {
     board: g.board,
     answer,
@@ -520,6 +544,22 @@ export function makePuzzle(spec, seed, opts = {}) {
     nodes: r.nodes,
     targets: targetsOf(g.board).length,
     fixed: spec.mirrors + slack - mirrors,   // 판에 박힌 거울 수
-    score: difficulty({ nodes: r.nodes, solutions: r.solutions, mirrors }),
+    cover: cov.cover,
+    box: cov.box,
+    score: difficulty({ nodes: r.nodes, solutions: r.solutions, mirrors, cover: cov.cover }),
   };
+}
+
+/** 정답의 빛이 판을 얼마나 쓰는가 */
+export function coverage(b, answer) {
+  const t = trace(b, answer);
+  const touched = new Set(t.path.map((p) => `${p.x},${p.y}`));
+  let usable = 0;
+  for (let i = 0; i < b.cells.length; i++) if (b.cells[i] !== WALL) usable++;
+  if (!touched.size || !usable) return { cover: 0, box: 0 };
+  const xs = [...touched].map((k) => +k.split(",")[0]);
+  const ys = [...touched].map((k) => +k.split(",")[1]);
+  const bw = Math.max(...xs) - Math.min(...xs) + 1;
+  const bh = Math.max(...ys) - Math.min(...ys) + 1;
+  return { cover: touched.size / usable, box: (bw * bh) / (b.W * b.H) };
 }

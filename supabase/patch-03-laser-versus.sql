@@ -79,10 +79,12 @@ grant select on public.laser_open_rooms to anon, authenticated;
 
 /* ══════════════ 함수 ══════════════ */
 
+/* jsonb 로 돌려준다. returns table (id, code) 로 두면 그 출력 이름이 레코드의
+   r.id · r.code 와 부딪혀 "column reference id is ambiguous" 로 죽는다. */
 create or replace function public.laser_room_create(
   p_title text, p_private boolean, p_join_code text,
   p_max int, p_low int, p_mid int, p_high int
-) returns table (id uuid, code text)
+) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare me uuid := auth.uid(); nm text; c text; r public.laser_rooms;
 begin
@@ -115,7 +117,7 @@ begin
   insert into public.laser_room_players (room_id, user_id, username, seat)
   values (r.id, me, nm, 0);
 
-  return query select r.id, r.code;
+  return jsonb_build_object('id', r.id, 'code', r.code);
 end $$;
 
 create or replace function public.laser_room_join(p_code text, p_pass text default null)

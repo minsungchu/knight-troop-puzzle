@@ -144,7 +144,7 @@ function openCreate() {
       });
       if (error) throw error;
       hideVeil();
-      await enter(data[0].id);
+      await enter(data.id);
     } catch (e) { toast(e.message || "방을 만들지 못했습니다."); }
   };
 }
