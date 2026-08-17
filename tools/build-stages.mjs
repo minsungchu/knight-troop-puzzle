@@ -143,8 +143,13 @@ const NEED = 100 - TUTORIAL.length;
 const tutorTop = Math.max(...stages.map((s) => s.score));
 if (pool.length < NEED) problems.push(`후보가 ${pool.length}판뿐 — ${NEED}판이 필요하다`);
 
-// 끝점은 통에서 가장 어려운 판이다. 100단계가 실제로 가장 어려워야 한다.
-const top = pool[pool.length - 1].score;
+/* 끝점을 통의 최고점으로 잡으면 안 된다. 최고점 근처에 판이 몇 개밖에 없으면
+   목표 곡선이 통을 앞질러, 그 위를 겨냥한 단계들이 모두 '가장 가까운 판' 하나쯤에
+   몰려 곡선이 평평해진다. 실제로 240점 이상이 4판뿐인데 곡선은 258을 겨냥해서
+   51~80단계가 203~211 로 눌렸다.
+   그래서 끝점은 '위로 이만큼은 판이 남아 있는' 점수로 잡는다. */
+const TAIL = 14;
+const top = pool[Math.max(0, pool.length - TAIL)].score;
 const used = new Array(pool.length).fill(false);
 for (let i = 0; i < NEED; i++) {
   const f = i / (NEED - 1);

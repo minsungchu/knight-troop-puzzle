@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>어느 쪽이 더 어렵나</title>
+<link rel="stylesheet" href="../css/theme.css">
+<link rel="stylesheet" href="../css/app.css">
+<link rel="stylesheet" href="../css/laser.css">
+<style>
+  .wrap{max-width:720px}
+  .ask{margin-top:14px; padding:12px 16px; border-radius:8px; line-height:1.8;
+    background:rgba(201,151,63,.1); border:1px solid rgba(201,151,63,.45)}
+  .verdict{margin-top:14px; padding:14px 18px; border-radius:10px; line-height:1.9;
+    background:rgba(20,32,50,.9); border:1px solid rgba(201,151,63,.4)}
+  .verdict code{user-select:all; color:var(--parch)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 style="font-family:var(--display); font-size:22px; margin:0">어느 쪽이 더 어렵나</h1>
+
+  <div class="ask">
+    난이도를 재는 두 지표가 서로 다른 판을 가리켜서, 어느 쪽을 따라야 할지 제가 정할 수 없습니다.
+    <b>두 판을 풀어 보시고 어느 쪽이 더 어려웠는지</b> 알려 주세요. 점수는 가려 뒀습니다.<br>
+    <span class="hint">한 판에 몇 분 걸릴 수 있습니다. 도중에 막히면 그것도 알려 주세요 —
+      "못 풀었다" 도 답입니다.</span>
+  </div>
+
+  <div class="lz-bar">
+    <button id="btnA" class="on">첫째 판</button>
+    <button id="btnB">둘째 판</button>
+    <button id="btnClear">전부 치우기</button>
+    <button id="btnUndo">되돌리기</button>
+    <span style="flex:1"></span>
+    <span class="hint" id="which"></span>
+  </div>
+
+  <div class="lz-goal" id="goal"></div>
+  <div class="lz-head"><span>경과<b id="time">0.0초</b></span></div>
+  <div class="lz-stage"><div class="lz-board" id="board"></div></div>
+  <div class="lz-done" id="done" hidden></div>
+  <div class="verdict" id="verdict" hidden></div>
+
+  <div class="panel">
+    <h2>규칙</h2>
+    <div class="hint">
+      빛은 판 바깥 황금색 발사구에서 화살표 방향으로 들어옵니다.
+      빈 칸을 눌러 거울을 <b>／</b> → <b>＼</b> → 없음으로 바꿉니다.
+      <b>주어진 거울을 하나도 남기지 않고</b> 놓고 <b>모든 목표</b>를 밝혀야 성공입니다.
+      흰 테두리 거울은 붙박이, 보라색은 분광기(빛이 갈라짐), 검은 칸은 벽입니다.
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { LaserBoard } from "../js/laser/board.js";
+
+const set = await (await fetch("compare.json")).json();
+const times = {};
+let cur = "A", board = null, t0 = 0, timer = null;
+
+const $ = (s) => document.querySelector(s);
+
+function load(which) {
+  cur = which;
+  $("#which").textContent = which === "A" ? "첫째 판" : "둘째 판";
+  $("#btnA").classList.toggle("on", which === "A");
+  $("#btnB").classList.toggle("on", which === "B");
+  $("#done").hidden = true;
+
+  board?.destroy();
+  board = new LaserBoard($("#board"), {
+    onChange: (st) => {
+      const mark = (ok, t) => `<span class="${ok ? "ok" : "no"}">${ok ? "✓" : "•"} ${t}</span>`;
+      $("#goal").innerHTML =
+        `${mark(st.mirrors === st.mirrorsNeeded, `거울 <b>${st.mirrorsNeeded}개 모두</b> (지금 ${st.mirrors}개)`)}` +
+        ` &nbsp;그리고&nbsp; ${mark(st.lit === st.targets, `목표 <b>${st.targets}곳 전부</b> (지금 ${st.lit}곳)`)}`;
+    },
+    onWin: () => {
+      clearInterval(timer);
+      const secs = (performance.now() - t0) / 1000;
+      times[cur] = secs;
+      $("#done").hidden = false;
+      $("#done").innerHTML = `<b>${$("#which").textContent} 완료</b> — ${secs.toFixed(1)}초`;
+      report();
+    },
+  });
+  board.load(set[which]);
+
+  t0 = performance.now();
+  clearInterval(timer);
+  timer = setInterval(() => {
+    $("#time").textContent = ((performance.now() - t0) / 1000).toFixed(1) + "초";
+  }, 100);
+}
+
+function report() {
+  if (!times.A || !times.B) return;
+  const el = $("#verdict");
+  el.hidden = false;
+  const line = `첫째 ${times.A.toFixed(1)}s / 둘째 ${times.B.toFixed(1)}s`;
+  el.innerHTML =
+    `둘 다 푸셨습니다. 걸린 시간 — <code>${line}</code><br>` +
+    `<span class="hint">이 줄과 함께, 어느 쪽이 더 <b>막막했는지</b>도 알려 주세요.
+      시간과 체감이 다를 수 있고, 저는 그 차이를 알아야 합니다.</span>`;
+}
+
+$("#btnA").onclick = () => load("A");
+$("#btnB").onclick = () => load("B");
+$("#btnClear").onclick = () => board?.clear();
+$("#btnUndo").onclick = () => board?.undo();
+load("A");
+</script>
+</body>
+</html>

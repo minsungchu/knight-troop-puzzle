@@ -216,13 +216,17 @@ export function solve(b, mirrorBudget, opts = {}) {
 
    해의 개수 항은 뺐다 — 이제 모든 판이 답 하나라서 상수였다.
    절대값에는 의미가 없다 — 판들을 줄 세우는 데만 쓴다. */
-export function difficulty({ nodes, mirrors, cover }) {
-  /* 빛이 판을 넓게 쓸수록 생각할 범위가 넓다. 이 항이 없으면 9×9 판의 정답이
-     65칸 중 13칸만 쓰면서도 249점을 받는 일이 생긴다 — 점수는 높은데 실제로는 쉽다.
-     cover 를 넘기지 않으면 (옛 자료를 다시 읽을 때) 이 항은 0 이 된다. */
-  const spread = cover == null ? 0 : (cover - 0.35) * 60;
-  return Math.round(Math.log2(nodes + 1) * 12 + mirrors * 4 + spread);
+export function difficulty({ nodes, mirrors }) {
+  return Math.round(Math.log2(nodes + 1) * 12 + mirrors * 4);
 }
+
+/* 커버리지를 점수에 넣어 봤다가 뺐다. 빛이 판을 넓게 쓰는 것은 분명히 좋은 조건이고
+   좁게 쓰는 판이 쉽게 느껴지는 것도 맞다. 그런데 점수 항으로 넣으면 커버리지가 높은
+   판의 점수가 부풀어, 노드 수가 훨씬 적은 판이 앞선다 — 실제로 그렇게 짜니 중반
+   단계의 탐색 노드가 32,800 에서 8,700 으로 줄었다.
+   노드 수는 사람이 푼 시간과 순위상관 0.79 로 재 본 지표이고, 커버리지는 재 본 적이
+   없다. 그래서 커버리지는 '이만큼은 써야 한다'는 걸러내는 조건으로만 쓰고, 줄 세우는
+   일은 검증된 지표에 맡긴다. 두 조건을 함께 만족하는 판만 단계가 된다. */
 
 /* ══════════════ 생성 ══════════════
    앞에서 뒤로 만든다 — 빛을 실제로 쏘면서 거울을 놓아 경로를 만들고,
@@ -546,7 +550,7 @@ export function makePuzzle(spec, seed, opts = {}) {
     fixed: spec.mirrors + slack - mirrors,   // 판에 박힌 거울 수
     cover: cov.cover,
     box: cov.box,
-    score: difficulty({ nodes: r.nodes, solutions: r.solutions, mirrors, cover: cov.cover }),
+    score: difficulty({ nodes: r.nodes, mirrors }),
   };
 }
 

@@ -15,7 +15,7 @@ const OUT = new URL("../data/laser-pool.json", import.meta.url);
 const minutes = Number(process.argv[2]) || 10;
 /** `node tools/grow-pool.mjs 30 hard` — hard 표시가 붙은 사양만 불린다.
     판 크기로 가르지 않는다 — 어려움을 정하는 건 크기가 아니라 거울 밀도다. */
-const onlyHard = process.argv[3] === "hard";
+const mode = process.argv[3] || "";        // "hard" | "top" | 빈칸(전부)
 
 /* 어려운 쪽이 모자라므로 큰 판에 시간을 더 준다. weight 는 시간 배분 비율이다.
    opts 는 조이기에 넘길 값이다. 큰 판은 기본값(표본 40, 노드 한도 칸수×4만)으로 두면
@@ -36,6 +36,14 @@ const SPECS = [
   { W: 7, mirrors: 9, walls: 4, splitters: 2, targets: 3, fixed: 2, weight: 8, hard: true },
   { W: 8, mirrors: 9, walls: 5, splitters: 2, targets: 3, fixed: 1, weight: 8, hard: true },
   { W: 8, mirrors: 10, walls: 5, splitters: 2, targets: 3, fixed: 1, weight: 10, hard: true },
+  /* 커버리지와 탐색량을 동시에 얻으려면 큰 판에 거울을 많이 놓아야 한다. 판 하나에
+     40초쯤 걸리지만(성공률 1.3%) 이 구간만 이렇게 만들 수 있다. 목표 상한을 올려야
+     조여진다 — 거울이 많으면 빛이 판을 덮어 벽 세울 자리가 없고, 목표 5개로는
+     남은 대안을 못 죽여 조이기가 no-constraint-left 로 반 넘게 죽는다. */
+  { W: 8, mirrors: 11, walls: 5, splitters: 3, targets: 4, fixed: 1, weight: 12, hard: true,
+    opts: { sampleSolutions: 14, nodeLimit: 2500000, maxTargets: 8 } },
+  { W: 9, mirrors: 11, walls: 6, splitters: 3, targets: 4, fixed: 1, weight: 12, hard: true,
+    opts: { sampleSolutions: 14, nodeLimit: 2500000, maxTargets: 8 } },
 ];
 
 /* 빛이 판을 이만큼은 써야 담는다. 답이 하나여도 한쪽 구석만 오가면 나머지는
@@ -80,7 +88,11 @@ const totalWeight = SPECS.reduce((s, x) => s + x.weight, 0);
 const t0 = Date.now();
 let added = 0, rejected = 0;
 
-const active = onlyHard ? SPECS.filter((s) => s.hard) : SPECS;
+/* 백그라운드로 오래 돌리면 중간에 끊겨서 뒤쪽 사양이 아예 안 돈다. 그래서
+   가장 필요한 사양만 골라 짧게 여러 번 돌릴 수 있게 해 둔다. */
+const active = mode === "top"  ? SPECS.filter((s) => s.hard && s.weight >= 8)
+             : mode === "hard" ? SPECS.filter((s) => s.hard)
+             : SPECS;
 const activeWeight = active.reduce((s, x) => s + x.weight, 0);
 for (const spec of active) {
   const budget = (minutes * 60000 * spec.weight) / activeWeight;
