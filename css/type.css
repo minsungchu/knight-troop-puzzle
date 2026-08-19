@@ -1,0 +1,175 @@
+/* 타자 도장 — 자리 지도 · 치는 화면 · 화면 자판 · 성 지키기 */
+
+/* ── 안내 ── */
+.ty-need-kb{
+  margin-top:20px; padding:16px 18px; border-radius:10px; line-height:1.8; font-size:13.5px;
+  background:rgba(224,87,109,.1); border:1px solid rgba(224,87,109,.45); color:var(--parch);
+}
+.ty-need-kb b{color:var(--u3)}
+
+/* ── 주제 고르기 ── */
+.ty-topics{display:flex; flex-wrap:wrap; gap:7px}
+.chip.ty-topic{display:inline-flex; align-items:center; gap:6px; font-family:var(--body); font-weight:400}
+.ty-mark{font-size:15px; line-height:1}
+
+/* ── 단계 지도 ── */
+.ty-map{
+  display:grid; gap:12px; padding:16px 20px 20px;
+  grid-template-columns:repeat(auto-fill, minmax(190px, 1fr));
+}
+.ty-stage{
+  display:flex; flex-direction:column; gap:4px; text-align:left; cursor:pointer;
+  padding:14px 15px 13px; border-radius:11px; color:inherit; font:inherit;
+  background:linear-gradient(150deg, rgba(29,44,67,.9), rgba(15,23,36,.9));
+  border:1px solid rgba(201,151,63,.26); transition:.15s;
+}
+.ty-stage:hover{border-color:var(--brass); transform:translateY(-2px)}
+.ty-stage:focus-visible{outline:2px solid var(--brass); outline-offset:2px}
+.ty-stage.locked{opacity:.42; cursor:default; pointer-events:none}
+.ty-stage.done{border-color:rgba(201,151,63,.55)}
+.ty-no{font-family:var(--latin); font-size:12px; color:var(--brass); letter-spacing:.14em}
+.ty-name{font-family:var(--display); font-size:16px; color:var(--parch)}
+.ty-sub{font-size:11.5px; color:var(--mist); line-height:1.6; min-height:2.6em}
+.ty-stars{font-size:15px; color:var(--brass); letter-spacing:2px}
+.ty-lock{font-size:11px; color:var(--mist)}
+.ty-rec{font-family:var(--mono); font-size:11px; color:var(--mist); font-variant-numeric:tabular-nums}
+
+/* ── 치는 화면 ── */
+.ty-bar{display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:14px 2px 0}
+.ty-bar .btn{font-size:12.5px; padding:7px 12px}
+.ty-title{font-family:var(--display); font-size:17px; color:var(--parch)}
+.ty-step{font-family:var(--mono); font-size:13px; color:var(--mist); font-variant-numeric:tabular-nums}
+.grow{flex:1}
+
+.ty-head{display:flex; flex-wrap:wrap; gap:8px 26px; padding:12px 2px 0; font-size:12.5px; color:var(--mist)}
+.ty-head b{font-family:var(--mono); font-size:15px; color:var(--parch); margin-left:8px;
+  font-variant-numeric:tabular-nums; display:inline-block; min-width:3.4ch}
+
+/* 종이 — 치는 줄이 놓이는 자리 */
+.ty-paper{
+  margin-top:14px; padding:26px 20px 20px; border-radius:12px; min-height:132px;
+  background:linear-gradient(160deg,#1b2b42,#0d1626); border:1px solid rgba(201,151,63,.3);
+  box-shadow:inset 0 0 60px rgba(0,0,0,.45);
+}
+.ty-line{display:flex; flex-wrap:wrap; gap:2px; align-items:flex-end; min-height:56px}
+.ty-next{margin-top:16px; padding-top:12px; border-top:1px dashed rgba(201,151,63,.2);
+  font-size:15px; color:#5d7085; letter-spacing:.06em; min-height:1.5em}
+
+/* 글자 칸 하나 */
+.ty-ch{position:relative; display:inline-flex; align-items:flex-end; justify-content:center;
+  min-width:.72em; padding:2px 3px; border-radius:5px; transition:background .1s}
+.ty-ch b{font-family:var(--display); font-weight:400; font-size:clamp(26px,4.4vw,34px); line-height:1.25}
+.ty-ch.sp{min-width:.5em}
+.ty-ch.hit b{color:var(--brass); opacity:.75}
+.ty-ch.rest b{color:#6a7f96}
+.ty-ch.cur{background:rgba(201,151,63,.18); box-shadow:inset 0 -3px 0 var(--brass)}
+.ty-ch.cur b{color:#fff6df}
+.ty-ch.cur.bad{background:rgba(224,87,109,.28); box-shadow:inset 0 -3px 0 var(--u3); animation:tyShake .22s}
+/* 목표 글자를 칸 위에 작게 남겨 둔다 — 조합 중에도 어디로 가는지 보이게 */
+.ty-goal{position:absolute; top:-14px; left:50%; transform:translateX(-50%);
+  font-style:normal; font-size:13px; color:var(--mist); opacity:.85; white-space:nowrap}
+
+.ty-finger{margin-top:16px; text-align:center; font-size:14px; color:var(--brass); letter-spacing:.06em; min-height:1.4em}
+
+/* ── 화면 자판 ── */
+.ty-kb{margin-top:10px; display:flex; flex-direction:column; gap:6px; align-items:center; user-select:none}
+.ty-kb-row{display:flex; gap:6px}
+.ty-k{
+  --fg:var(--mist);
+  position:relative; width:clamp(34px,4.6vw,46px); height:clamp(38px,5vw,50px);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  border-radius:7px; background:linear-gradient(#20304a,#16212f);
+  border:1px solid rgba(201,151,63,.2); border-bottom:3px solid color-mix(in srgb, var(--fg) 55%, #0a1220);
+  transition:background .1s, box-shadow .1s, transform .1s;
+}
+.ty-k-main{font-family:var(--display); font-size:16px; color:var(--parch)}
+.ty-k-up{position:absolute; top:2px; right:4px; font-size:10px; color:var(--mist)}
+.ty-k-shift{width:clamp(42px,5.6vw,60px)}
+.ty-k-shift .ty-k-main,.ty-k-space .ty-k-main{font-family:var(--body); font-size:11px; color:var(--mist)}
+.ty-k-space{width:clamp(160px,26vw,260px)}
+/* 홈 위치 돌기 — 검지가 어디에 놓이는지 */
+.ty-k-home::after{content:""; position:absolute; bottom:6px; width:14px; height:2px; border-radius:2px; background:rgba(255,231,178,.5)}
+.ty-k.on{
+  background:linear-gradient(color-mix(in srgb, var(--fg) 62%, #16212f), color-mix(in srgb, var(--fg) 34%, #0e1726));
+  border-color:var(--fg); transform:translateY(1px);
+  box-shadow:0 0 0 2px color-mix(in srgb, var(--fg) 40%, transparent), 0 0 20px -4px var(--fg);
+}
+.ty-k.on .ty-k-main{color:#0b1220; font-weight:700}
+.ty-k.on-shift{border-color:var(--fg); box-shadow:0 0 0 2px color-mix(in srgb, var(--fg) 35%, transparent)}
+.ty-k.on-shift .ty-k-main{color:var(--parch)}
+.ty-k.bad{background:linear-gradient(#4a1c26,#2a1017); border-color:var(--u3); animation:tyShake .22s}
+
+.ty-legend{display:flex; flex-wrap:wrap; gap:6px 14px; justify-content:center; margin-top:14px; font-size:10.5px; color:var(--mist)}
+.ty-legend span{display:inline-flex; align-items:center; gap:5px}
+.ty-legend i{width:9px; height:9px; border-radius:2px; display:inline-block}
+
+@keyframes tyShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+
+/* ── 끝난 뒤 ── */
+.ty-done{
+  margin-top:18px; padding:30px 26px; text-align:center; border-radius:12px;
+  background:linear-gradient(160deg,#1b2b42,#0d1626); border:1px solid rgba(201,151,63,.5);
+}
+.ty-done h2{font-family:var(--display); color:var(--brass); margin:0 0 8px; font-size:23px}
+.ty-done .stats{display:flex; gap:24px; justify-content:center; flex-wrap:wrap; margin:18px 0 6px}
+.ty-done .stat{font-size:11px; color:var(--mist); letter-spacing:.1em}
+.ty-done .stat b{display:block; font-family:var(--latin); font-size:24px; color:var(--parch); margin-top:5px; font-variant-numeric:tabular-nums}
+.ty-bigstars{font-size:38px; color:var(--brass); letter-spacing:6px; margin:6px 0}
+
+/* ── 성 지키기 ── */
+.ty-hp{font-size:18px; color:var(--u3); letter-spacing:3px}
+.ty-hp .gone{color:rgba(224,87,109,.22)}
+
+.ty-field{
+  position:relative; margin-top:14px; height:min(40vh,300px); border-radius:12px; overflow:hidden;
+  background:
+    radial-gradient(700px 300px at 12% 100%, rgba(178,112,58,.22), transparent 65%),
+    linear-gradient(180deg,#16233a,#0b1322);
+  border:1px solid rgba(201,151,63,.3);
+}
+.ty-field::after{content:""; position:absolute; left:0; right:0; bottom:0; height:26%;
+  background:linear-gradient(180deg, transparent, rgba(10,18,32,.85)); pointer-events:none}
+.ty-field.hit{animation:tyQuake .4s}
+@keyframes tyQuake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}55%{transform:translateX(5px)}80%{transform:translateX(-2px)}}
+
+.ty-castle{position:absolute; left:0; bottom:8%; width:clamp(74px,11vw,110px); padding:0 6px; z-index:2}
+.ty-castle svg{width:100%; height:auto; filter:drop-shadow(0 6px 14px rgba(0,0,0,.6))}
+
+.ty-foe{
+  position:absolute; left:100%; transform:translate(-50%,-50%);
+  display:flex; flex-direction:column; align-items:center; gap:4px; white-space:nowrap;
+  transition:opacity .2s;
+}
+.ty-foe-mark{font-size:26px; line-height:1; filter:drop-shadow(0 3px 6px rgba(0,0,0,.6))}
+.ty-foe-word{
+  display:flex; gap:1px; padding:4px 9px; border-radius:8px;
+  background:rgba(10,18,32,.82); border:1px solid rgba(201,151,63,.28);
+  font-family:var(--display); font-size:17px; color:#8ea3bb;
+}
+.ty-foe.target .ty-foe-word{border-color:var(--brass); box-shadow:0 0 18px -4px var(--brass); background:rgba(20,32,50,.95)}
+.ty-foe.target .ty-foe-mark{transform:scale(1.15)}
+.ty-foe.near .ty-foe-mark{animation:tyPulse .6s infinite alternate}
+.ty-foe.near .ty-foe-word{border-color:var(--u3)}
+@keyframes tyPulse{to{transform:scale(1.22); filter:drop-shadow(0 0 10px rgba(224,87,109,.8))}}
+.ty-foe.pop{animation:tyPop .26s forwards}
+@keyframes tyPop{to{transform:translate(-50%,-70%) scale(1.5); opacity:0}}
+.ty-foe.crash{animation:tyCrash .26s forwards}
+@keyframes tyCrash{to{transform:translate(-50%,-30%) scale(.6); opacity:0}}
+.ty-foe.shake{animation:tyShake .22s}
+/* 게임 안의 글자 칸은 작게 — 지문 화면과 크기를 같이 쓰면 적이 화면을 다 덮는다 */
+.ty-foe .ty-ch b{font-size:17px}
+.ty-foe .ty-goal{top:-11px; font-size:10px}
+
+.ty-banner{
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-family:var(--display); font-size:clamp(26px,5vw,40px); color:var(--brass);
+  text-shadow:0 4px 18px rgba(0,0,0,.8); pointer-events:none; opacity:0; z-index:3;
+}
+.ty-banner.show{animation:tyBanner 1.2s ease-out}
+@keyframes tyBanner{0%{opacity:0; transform:scale(.7)}25%{opacity:1; transform:scale(1)}75%{opacity:1}100%{opacity:0}}
+
+@media (max-width:640px){
+  .ty-k{width:8.4vw; height:9vw}
+  .ty-k-main{font-size:13px}
+  .ty-legend{display:none}
+}

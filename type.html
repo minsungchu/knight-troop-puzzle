@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>타자 도장 — 자리 익히기 · 낱말 · 성 지키기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/theme.css">
+<link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/hub.css">
+<link rel="stylesheet" href="css/type.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="masthead">
+    <div class="brand">
+      <h1>타자 도장</h1>
+      <div class="sub">TYPING DOJO · HANGUL</div>
+    </div>
+
+    <nav class="tabs" role="tablist" aria-label="화면 전환">
+      <a class="tab tab-home" href="./" aria-label="게임 고르기로">◂ 게임</a>
+      <button class="tab on" data-tab="practice" role="tab" aria-selected="true">익히기</button>
+      <button class="tab" data-tab="words" role="tab" aria-selected="false">낱말</button>
+      <button class="tab" data-tab="castle" role="tab" aria-selected="false">성 지키기</button>
+    </nav>
+
+    <div class="account" id="account"></div>
+  </header>
+
+  <div class="ty-need-kb" id="tyNeedKeyboard" hidden>
+    이 도장은 <b>자판을 직접 읽습니다.</b> 화면 키보드로는 칠 수 없으니
+    키보드가 붙은 컴퓨터에서 열어 주세요. 한/영 상태는 아무래도 괜찮습니다.
+  </div>
+
+  <!-- ══════════════ 자리 익히기 ══════════════ -->
+  <section class="view" data-view="practice">
+    <div id="tyMap"></div>
+    <div id="tyPlay" hidden></div>
+  </section>
+
+  <!-- ══════════════ 낱말 연습 ══════════════ -->
+  <section class="view" data-view="words" hidden>
+    <div id="tyWordHome"></div>
+    <div id="tyWordPlay" hidden></div>
+  </section>
+
+  <!-- ══════════════ 성 지키기 ══════════════ -->
+  <section class="view" data-view="castle" hidden>
+    <div id="tyGameHome"></div>
+    <div id="tyGamePlay" hidden></div>
+  </section>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="veil" id="veil"><div class="card" id="card"></div></div>
+
+<script type="module" src="js/type/main.js"></script>
+</body>
+</html>
