@@ -30,38 +30,56 @@ export const KEYMAP = {
   KeyB: ["ㅠ", "ㅠ"], KeyN: ["ㅜ", "ㅜ"], KeyM: ["ㅡ", "ㅡ"],
 };
 
-/* 한글이 아닌 스트로크(공백·문장부호)도 같은 방식으로 자리를 찾아 준다. */
-const PUNCT = {
-  " ": { code: "Space", shift: false },
-  ".": { code: "Period", shift: false },
-  ",": { code: "Comma", shift: false },
-  "?": { code: "Slash", shift: true },
-  "!": { code: "Digit1", shift: true },
+/* 한글이 아닌 자리 — 숫자줄과 문장부호.
+ *
+ * 자리 익히기만 생각하면 없어도 됐다. 글쓰기를 붙이면서 반드시 필요해졌다.
+ * 아이가 자유롭게 글을 쓸 때는 목표 지문이 없으므로 무엇을 누르든 그대로 나와야
+ * 하는데, 느낌표 하나를 못 받으면 "신난다!"에서 손이 멈춘다.
+ *
+ * 그래서 자판에 있는 것은 다 받는다. 배열은 미국식 QWERTY 그대로다. */
+const SYMBOLS = {
+  Backquote: ["`", "~"],
+  Digit1: ["1", "!"], Digit2: ["2", "@"], Digit3: ["3", "#"], Digit4: ["4", "$"], Digit5: ["5", "%"],
+  Digit6: ["6", "^"], Digit7: ["7", "&"], Digit8: ["8", "*"], Digit9: ["9", "("], Digit0: ["0", ")"],
+  Minus: ["-", "_"], Equal: ["=", "+"],
+  BracketLeft: ["[", "{"], BracketRight: ["]", "}"], Backslash: ["\\", "|"],
+  Semicolon: [";", ":"], Quote: ["'", '"'],
+  Comma: [",", "<"], Period: [".", ">"], Slash: ["/", "?"],
 };
 
-/* 스트로크 → 어느 키를 눌러야 하나 */
+/** 화면 자판이 이 표를 그대로 그린다 — 자리와 그림이 어긋날 일이 없다. */
+export { SYMBOLS };
+
+/* 스트로크 → 어느 키를 눌러야 하나.
+   한글 자리를 먼저 넣는다 — 같은 키에 자모와 기호가 겹칠 때 자모가 이긴다. */
 const REVERSE = (() => {
   const m = new Map();
   for (const [code, [plain, shifted]] of Object.entries(KEYMAP)) {
     if (!m.has(plain)) m.set(plain, { code, shift: false });
     if (!m.has(shifted)) m.set(shifted, { code, shift: true });
   }
-  for (const [ch, v] of Object.entries(PUNCT)) m.set(ch, v);
+  for (const [code, [plain, shifted]] of Object.entries(SYMBOLS)) {
+    if (!m.has(plain)) m.set(plain, { code, shift: false });
+    if (!m.has(shifted)) m.set(shifted, { code, shift: true });
+  }
+  m.set(" ", { code: "Space", shift: false });
+  m.set("\n", { code: "Enter", shift: false });
   return m;
 })();
 
 /** 이 스트로크를 치려면 어느 키를 어떻게 눌러야 하는가. 모르면 null. */
 export function keyFor(stroke) { return REVERSE.get(stroke) || null; }
 
-/** 눌린 키 → 스트로크. 자판에 없는 키면 null. */
+/** 눌린 키 → 스트로크. 자판에 없는 키면 null.
+ *  한글 자리가 먼저다 — Comma·Period·Slash 처럼 둘 다 있는 자리는 없지만,
+ *  나중에 겹치더라도 자모 쪽이 이기도록 순서를 이렇게 둔다. */
 export function strokeFor(code, shift) {
-  const pair = KEYMAP[code];
-  if (pair) return pair[shift ? 1 : 0];
+  const jamo = KEYMAP[code];
+  if (jamo) return jamo[shift ? 1 : 0];
+  const sym = SYMBOLS[code];
+  if (sym) return sym[shift ? 1 : 0];
   if (code === "Space") return " ";
-  if (code === "Period" && !shift) return ".";
-  if (code === "Comma" && !shift) return ",";
-  if (code === "Slash" && shift) return "?";
-  if (code === "Digit1" && shift) return "!";
+  if (code === "Enter") return "\n";
   return null;
 }
 

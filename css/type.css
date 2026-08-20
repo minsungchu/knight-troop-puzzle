@@ -72,23 +72,27 @@
 .ty-finger{margin-top:16px; text-align:center; font-size:14px; color:var(--brass); letter-spacing:.06em; min-height:1.4em}
 
 /* ── 화면 자판 ── */
-.ty-kb{margin-top:10px; display:flex; flex-direction:column; gap:6px; align-items:center; user-select:none}
-.ty-kb-row{display:flex; gap:6px}
+/* 키 너비는 --w 배수로 온다(실제 자판 비율). --u 한 칸에 사이 간격을 더해 계산하면
+   여러 칸짜리 키가 아래 줄 경계와 정확히 맞아떨어진다. */
+.ty-kb{--u:clamp(28px,3.4vw,42px); --kgap:5px;
+  margin-top:10px; display:flex; flex-direction:column; gap:var(--kgap); align-items:center; user-select:none}
+.ty-kb-row{display:flex; gap:var(--kgap)}
 .ty-k{
-  --fg:var(--mist);
-  position:relative; width:clamp(34px,4.6vw,46px); height:clamp(38px,5vw,50px);
+  --fg:var(--mist); --w:1;
+  position:relative; width:calc(var(--u) * var(--w) + (var(--w) - 1) * var(--kgap));
+  height:calc(var(--u) * 1.08);
   display:flex; flex-direction:column; align-items:center; justify-content:center;
-  border-radius:7px; background:linear-gradient(#20304a,#16212f);
+  border-radius:6px; background:linear-gradient(#20304a,#16212f);
   border:1px solid rgba(201,151,63,.2); border-bottom:3px solid color-mix(in srgb, var(--fg) 55%, #0a1220);
   transition:background .1s, box-shadow .1s, transform .1s;
 }
-.ty-k-main{font-family:var(--display); font-size:16px; color:var(--parch)}
-.ty-k-up{position:absolute; top:2px; right:4px; font-size:10px; color:var(--mist)}
-.ty-k-shift{width:clamp(42px,5.6vw,60px)}
-.ty-k-shift .ty-k-main,.ty-k-space .ty-k-main{font-family:var(--body); font-size:11px; color:var(--mist)}
-.ty-k-space{width:clamp(160px,26vw,260px)}
+.ty-k-main{font-family:var(--display); font-size:calc(var(--u) * .38); color:var(--parch); line-height:1}
+.ty-k-up{position:absolute; top:2px; right:4px; font-size:calc(var(--u) * .24); color:var(--mist); line-height:1}
+.ty-k-word{font-family:var(--body); font-size:calc(var(--u) * .25); color:var(--mist)}
+/* 눌러도 아무 일이 없는 자리는 있는 듯 없는 듯 */
+.ty-k-dead{opacity:.4; border-bottom-color:rgba(147,167,192,.25)}
 /* 홈 위치 돌기 — 검지가 어디에 놓이는지 */
-.ty-k-home::after{content:""; position:absolute; bottom:6px; width:14px; height:2px; border-radius:2px; background:rgba(255,231,178,.5)}
+.ty-k-home::after{content:""; position:absolute; bottom:5px; width:13px; height:2px; border-radius:2px; background:rgba(255,231,178,.5)}
 .ty-k.on{
   background:linear-gradient(color-mix(in srgb, var(--fg) 62%, #16212f), color-mix(in srgb, var(--fg) 34%, #0e1726));
   border-color:var(--fg); transform:translateY(1px);
@@ -169,7 +173,55 @@
 @keyframes tyBanner{0%{opacity:0; transform:scale(.7)}25%{opacity:1; transform:scale(1)}75%{opacity:1}100%{opacity:0}}
 
 @media (max-width:640px){
-  .ty-k{width:8.4vw; height:9vw}
-  .ty-k-main{font-size:13px}
   .ty-legend{display:none}
 }
+
+/* ── 목록 (지문 · 글감 · 내 글 · 방) ── */
+.ty-h3{font-family:var(--display); font-size:14.5px; color:var(--brass); margin:0 0 10px; letter-spacing:.04em}
+.ty-list{display:grid; gap:8px; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr))}
+.ty-item{
+  display:flex; flex-direction:column; gap:4px; text-align:left; color:inherit; font:inherit;
+  padding:12px 14px; border-radius:10px; cursor:pointer;
+  background:linear-gradient(150deg, rgba(29,44,67,.85), rgba(15,23,36,.85));
+  border:1px solid rgba(201,151,63,.24); transition:.15s;
+}
+button.ty-item:hover, .ty-item-open:hover{border-color:var(--brass); transform:translateY(-2px)}
+.ty-item:focus-visible, .ty-item-open:focus-visible{outline:2px solid var(--brass); outline-offset:2px}
+.ty-item[disabled], .ty-item-open[disabled]{opacity:.4; pointer-events:none}
+.ty-item-name{font-size:14px; color:var(--parch)}
+.ty-item-sub{font-size:11.5px; color:var(--mist); line-height:1.6}
+/* 목록 한 줄에 단추가 하나 더 붙는 꼴 (내 글 · 방) */
+.ty-item-row{flex-direction:row; align-items:center; gap:10px; cursor:default; padding:0}
+.ty-item-row:hover{transform:none}
+.ty-item-open{flex:1; min-width:0; display:flex; flex-direction:column; gap:4px; text-align:left;
+  background:none; border:0; color:inherit; font:inherit; cursor:pointer; padding:12px 14px; border-radius:10px}
+.ty-item-open .ty-item-sub{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.ty-item-del{font-size:11.5px; padding:6px 10px; margin-right:12px; flex:none}
+.ty-item-code{font-family:var(--mono); font-size:12.5px; color:var(--brass); padding-right:14px; letter-spacing:.1em}
+
+/* ── 자유 작문 책상 ── */
+.ty-hintline{margin-top:12px; padding:9px 13px; border-radius:8px; font-size:13px;
+  background:rgba(201,151,63,.12); border:1px solid rgba(201,151,63,.45); color:#f0e2c4}
+.ty-desk{
+  min-height:190px; max-height:42vh; overflow-y:auto; cursor:text;
+  font-family:var(--display); font-size:clamp(17px,2.2vw,21px); line-height:2;
+  white-space:pre-wrap; word-break:break-word; text-align:left;
+}
+.ty-desk .ty-w-text{color:var(--parch)}
+.ty-caret{display:inline-block; width:2px; height:1.1em; vertical-align:-.16em;
+  background:var(--brass); margin-left:1px; animation:tyBlink 1s step-end infinite}
+@keyframes tyBlink{50%{opacity:0}}
+
+/* ── 대결 진행 막대 ── */
+.ty-score{display:flex; flex-direction:column; gap:9px; margin-top:14px}
+.ty-race-head{display:flex; justify-content:space-between; gap:10px; font-size:12.5px; color:var(--mist)}
+.ty-race-head .num{font-family:var(--mono); font-variant-numeric:tabular-nums}
+.ty-race.me .ty-race-head{color:var(--parch)}
+.ty-race-bar{height:9px; margin-top:4px; border-radius:99px; overflow:hidden;
+  background:rgba(255,255,255,.07); border:1px solid rgba(201,151,63,.18)}
+.ty-race-bar>div{height:100%; width:0; background:#6fe3b0; transition:width .25s}
+.ty-race.me .ty-race-bar>div{background:var(--brass)}
+.ty-code{font-family:var(--mono); letter-spacing:.14em; color:var(--brass)}
+
+/* 탭이 다섯 개가 되면 좁은 화면에서 넘친다 — 넘치면 줄을 바꾼다 */
+.tabs{flex-wrap:wrap}

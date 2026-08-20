@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>타자 도장 — 자리 익히기 · 낱말 · 성 지키기</title>
+<title>타자 도장 — 익히기 · 낱말 · 글쓰기 · 성 지키기 · 대결</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
@@ -24,7 +24,9 @@
       <a class="tab tab-home" href="./" aria-label="게임 고르기로">◂ 게임</a>
       <button class="tab on" data-tab="practice" role="tab" aria-selected="true">익히기</button>
       <button class="tab" data-tab="words" role="tab" aria-selected="false">낱말</button>
+      <button class="tab" data-tab="write" role="tab" aria-selected="false">글쓰기</button>
       <button class="tab" data-tab="castle" role="tab" aria-selected="false">성 지키기</button>
+      <button class="tab" data-tab="duel" role="tab" aria-selected="false">대결</button>
     </nav>
 
     <div class="account" id="account"></div>
@@ -47,10 +49,21 @@
     <div id="tyWordPlay" hidden></div>
   </section>
 
+  <!-- ══════════════ 글쓰기 ══════════════ -->
+  <section class="view" data-view="write" hidden>
+    <div id="tyWriteHome"></div>
+    <div id="tyWritePlay" hidden></div>
+  </section>
+
   <!-- ══════════════ 성 지키기 ══════════════ -->
   <section class="view" data-view="castle" hidden>
     <div id="tyGameHome"></div>
     <div id="tyGamePlay" hidden></div>
+  </section>
+
+  <!-- ══════════════ 대결 ══════════════ -->
+  <section class="view" data-view="duel" hidden>
+    <div id="tyDuelBody"></div>
   </section>
 </div>
 
