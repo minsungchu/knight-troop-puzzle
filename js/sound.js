@@ -170,3 +170,33 @@ export function win() {
     tone({ freq: f * 2, type: "sine", dur: 0.4, gain: 0.03, at: i * 0.11, curve: 6 });
   });
 }
+
+/* ── 타자 ── */
+
+/** 자판을 한 번 제대로 눌렀을 때. 초당 대여섯 번씩 울리므로 아주 작고 마르게. */
+export function key() {
+  if (!ready()) return;
+  noise({ dur: 0.018, gain: 0.045, lo: 1800, hi: 7000, q: 1.4 });
+  tone({ freq: 340, type: "triangle", dur: 0.03, gain: 0.03, glide: 0.7 });
+}
+
+/** 틀린 자리 — 낮고 짧게 '텅'. 혼내는 소리가 아니라 알려 주는 소리여야 한다. */
+export function miss() {
+  if (!ready()) return;
+  noise({ dur: 0.05, gain: 0.07, lo: 180, hi: 900 });
+  tone({ freq: 128, type: "sine", dur: 0.13, gain: 0.13, glide: 0.7 });
+}
+
+/** 낱말 하나를 끝냈을 때 — 위로 튕기는 짧은 두 음 */
+export function word() {
+  if (!ready()) return;
+  tone({ freq: 659.25, type: "triangle", dur: 0.1, gain: 0.07 });
+  tone({ freq: 987.77, type: "sine", dur: 0.12, gain: 0.04, at: 0.055 });
+}
+
+/** 성이 한 대 맞았을 때 — 성벽이 무너지는 둔한 소리 */
+export function hurt() {
+  if (!ready()) return;
+  noise({ dur: 0.22, gain: 0.16, lo: 90, hi: 700, q: 0.5 });
+  tone({ freq: 82, type: "sine", dur: 0.34, gain: 0.2, glide: 0.55, curve: 4 });
+}
