@@ -5,9 +5,10 @@
  */
 import { $, esc } from "../ui.js";
 import * as Sfx from "../sound.js";
-import { STAGES, buildStage, starsFor, PASS_ACC, CPM_2, CPM_3 } from "./curriculum.js";
+import { STAGES, buildStage, EN_STAGES, buildEnStage, starsFor, PASS_ACC, CPM_2, CPM_3 } from "./curriculum.js";
 import * as Progress from "./progress.js";
 import * as Topics from "./topics.js";
+import * as Lang from "./lang.js";
 import * as Trainer from "./trainer.js";
 
 let mapEl, playEl;
@@ -17,27 +18,42 @@ export function init() {
   playEl = $("#tyPlay");
   document.addEventListener("type-progress", () => { if (!playEl.hidden) return; drawMap(); });
   document.addEventListener("type-topics", () => { if (playEl.hidden) drawMap(); });
+  document.addEventListener("type-lang", () => { if (playEl.hidden) drawMap(); });
 }
+
+/* 지금 갈래의 단계 표와 기록 이름 앞머리 */
+const ladder = () => (Lang.isEn() ? EN_STAGES : STAGES);
+const prefix = () => (Lang.isEn() ? "en:" : "");
 
 const stars = (n) => `<span class="ty-stars">${"★".repeat(n)}${"☆".repeat(3 - n)}</span>`;
 
 export function drawMap() {
   if (!mapEl) return;
-  const open = Progress.unlockedThrough(STAGES);
+  const en = Lang.isEn();
+  const list = ladder();
+  const open = Progress.unlockedThrough(list, prefix());
   mapEl.innerHTML = `
     <div class="panel">
       <div class="panel-head">
         <h2>자리 익히기</h2>
-        <p>홈row 여덟 자리부터 시작한다. 한 단계를 정확도 ${PASS_ACC}% 로 마치면 다음 자리가 열린다.
+        <p>${en ? "홈 자리 <b>a s d f · j k l</b> 부터 시작한다" : "홈row 여덟 자리부터 시작한다"}.
+           한 단계를 정확도 ${PASS_ACC}% 로 마치면 다음 자리가 열린다.
            빠르게 치면 별이 늘어난다 — 분당 ${CPM_2}타에 별 둘, ${CPM_3}타에 별 셋.</p>
       </div>
-      <div class="picker"><div data-topics></div>
-        <p class="hint">고른 주제의 낱말 가운데 그 단계까지 배운 자리로 칠 수 있는 것이 섞여 나옵니다.</p></div>
+      <div class="picker">
+        <div data-lang></div>
+        ${en
+          ? `<p class="hint">${Lang.ready()
+              ? "그 단계까지 배운 자리로 칠 수 있는 영어 낱말이 섞여 나옵니다. 대문자는 7단계부터."
+              : "<b>영문 낱말 자료를 불러오지 못했습니다.</b> data/type-en.json 을 확인하세요."}</p>`
+          : `<div data-topics></div>
+             <p class="hint">고른 주제의 낱말 가운데 그 단계까지 배운 자리로 칠 수 있는 것이 섞여 나옵니다.</p>`}
+      </div>
       <div class="ty-map">
-        ${STAGES.map((s) => {
-          const got = Progress.stageStars(s.n);
+        ${list.map((s) => {
+          const got = Progress.stageStars(s.n, prefix());
           const locked = s.n > open;
-          const rec = Progress.get("stage:" + s.n);
+          const rec = Progress.get(prefix() + "stage:" + s.n);
           return `<button class="ty-stage${locked ? " locked" : ""}${got ? " done" : ""}"
                     data-stage="${s.n}"${locked ? " disabled" : ""}>
             <span class="ty-no">${s.n}</span>
@@ -49,19 +65,24 @@ export function drawMap() {
         }).join("")}
       </div>
     </div>`;
-  Topics.chips(mapEl.querySelector("[data-topics]"));
+  Lang.switcher(mapEl.querySelector("[data-lang]"), drawMap);
+  if (!en) Topics.chips(mapEl.querySelector("[data-topics]"));
   mapEl.querySelectorAll(".ty-stage:not(.locked)").forEach((b) => {
     b.onclick = () => { Sfx.select(); play(Number(b.dataset.stage)); };
   });
 }
 
 function play(n) {
-  const stage = STAGES.find((s) => s.n === n);
-  const lines = buildStage(stage, Topics.words());
+  const en = Lang.isEn();
+  const stage = ladder().find((s) => s.n === n);
+  if (!stage) return;
+  const lines = en ? buildEnStage(stage, { words: Lang.words(), sentences: Lang.sentences() })
+                   : buildStage(stage, Topics.words());
+  Lang.apply();
   mapEl.hidden = true;
   playEl.hidden = false;
   Trainer.start(playEl, {
-    title: `${n}단계 · ${stage.title}`,
+    title: `${en ? "영문 " : ""}${n}단계 · ${stage.title}`,
     backLabel: "지도로",
     lines,
     onQuit: home,
@@ -80,11 +101,11 @@ export function home() {
 
 function finish(stage, s) {
   const got = starsFor(s.acc, s.cpm);
-  const before = Progress.stageStars(stage.n);
-  if (got) Progress.record("stage:" + stage.n, { stars: got, cpm: s.cpm, acc: s.acc });
+  const before = Progress.stageStars(stage.n, prefix());
+  if (got) Progress.record(prefix() + "stage:" + stage.n, { stars: got, cpm: s.cpm, acc: s.acc });
   if (got) Sfx.win(); else Sfx.hurt();
 
-  const opened = got > 0 && before === 0 && stage.n < STAGES.length;
+  const opened = got > 0 && before === 0 && stage.n < ladder().length;
   playEl.innerHTML = `
     <div class="ty-done">
       <h2>${got ? "잘했어요!" : "조금만 더"}</h2>

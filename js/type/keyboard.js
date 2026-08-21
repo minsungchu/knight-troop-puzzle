@@ -13,7 +13,7 @@
  * 그게 안 들어간다 — 폰 너비를 15로 나누면 키 하나가 손끝보다 작아진다. 그래서
  * 10칸짜리 배열을 따로 두고, 숫자·기호는 한 겹 뒤로 넘긴다. 폰 자판이 다 그렇게 한다.
  */
-import { KEYMAP, SYMBOLS, keyFor, strokeFor, fingerOf, FINGERS } from "./hangul.js";
+import { pairOf, getLayout, keyFor, strokeFor, fingerOf, FINGERS } from "./hangul.js";
 import { inject } from "./input.js";
 
 /* 키 하나: [code, 너비, 글자, shift 를 물고 있는 자리인가] */
@@ -64,7 +64,7 @@ const COMPACT_SYM = [[
   k("Semicolon", 1, null, true), k("Semicolon"), k("Slash"), k("Equal"), k("Equal", 1, null, true),
   k("BracketLeft"), k("BracketRight"), k("Backslash"), k("Backquote"), k("Backspace", 1, "⌫"),
 ], [
-  k("Layer", 1.5, "가나다"), k("Space", 6, "사이 띄우기"), k("Enter", 2.5, "⏎"),
+  k("Layer", 1.5, "글자"), k("Space", 6, "사이 띄우기"), k("Enter", 2.5, "⏎"),
 ]];
 
 /* 눌러도 아무 일이 없는 자리. 그림을 맞추려고 그려 둘 뿐이다. */
@@ -82,7 +82,7 @@ const live = new Set();               // 화면에 떠 있는 자판들 (화면 
 
 function labelOf(key) {
   if (key.label) return key.label;
-  const pair = KEYMAP[key.code] || SYMBOLS[key.code];
+  const pair = pairOf(key.code);
   if (!pair) return "";
   return pair[key.shift ? 1 : 0];
 }
@@ -116,6 +116,7 @@ function paint(el) {
   const st = state.get(el);
   el.classList.add("ty-kb");
   el.classList.toggle("ty-kb-compact", st.compact);
+  el.dataset.layout = getLayout();
   el.innerHTML = rowsFor(st).map((row) => `<div class="ty-kb-row">${row.map((key) => {
     const f = fingerOf(key.code);
     const dead = DEAD.has(key.code);
@@ -126,7 +127,7 @@ function paint(el) {
       wide ? "ty-k-cmd" : "",
       (key.code === "KeyF" || key.code === "KeyJ") && !st.compact ? "ty-k-home" : "",
       key.code.startsWith("Shift") && st.sticky ? "sticky" : ""].filter(Boolean).join(" ");
-    const pair = KEYMAP[key.code] || SYMBOLS[key.code];
+    const pair = pairOf(key.code);
     const up = !st.compact && pair && pair[1] !== pair[0] ? `<span class="ty-k-up">${pair[1]}</span>` : "";
     const face = key.label
       ? `<span class="ty-k-main ty-k-word">${key.label}</span>`

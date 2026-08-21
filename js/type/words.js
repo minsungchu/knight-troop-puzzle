@@ -5,9 +5,10 @@
  */
 import { $ } from "../ui.js";
 import * as Sfx from "../sound.js";
-import { buildWordRun } from "./curriculum.js";
+import { buildWordRun, buildEnWordRun } from "./curriculum.js";
 import * as Progress from "./progress.js";
 import * as Topics from "./topics.js";
+import * as Lang from "./lang.js";
 import * as Trainer from "./trainer.js";
 
 const COUNT = 20;        // 한 판에 치는 낱말 수
@@ -19,38 +20,46 @@ export function init() {
   homeEl = $("#tyWordHome");
   playEl = $("#tyWordPlay");
   document.addEventListener("type-progress", () => { if (playEl.hidden) draw(); });
+  document.addEventListener("type-lang", () => { if (playEl.hidden) draw(); });
 }
 
 export function draw() {
   if (!homeEl) return;
-  const best = Progress.get("words");
-  const n = Topics.words().length;
+  const en = Lang.isEn();
+  const best = Progress.get(Lang.item("words"));
+  const n = en ? Lang.words().length : Topics.words().length;
   homeEl.innerHTML = `
     <div class="panel">
       <div class="panel-head">
         <h2>낱말 연습</h2>
-        <p>고른 주제에서 낱말 ${COUNT}개를 뽑아 냅니다. 지금 고른 주제의 낱말은 ${n}개.</p>
+        <p>${en ? `영어 낱말 ${COUNT}개를 뽑아 냅니다. 가진 낱말은 ${n}개.`
+                : `고른 주제에서 낱말 ${COUNT}개를 뽑아 냅니다. 지금 고른 주제의 낱말은 ${n}개.`}</p>
       </div>
       <div class="panel-body">
-        <div data-topics></div>
+        <div data-lang></div>
+        ${en ? "" : `<div data-topics style="margin-top:12px"></div>`}
         ${best.cpm ? `<p class="hint" style="margin-top:14px">최고 기록 — 분당 ${best.cpm}타 · 정확도 ${best.acc}%</p>` : ""}
         <div class="card-actions" style="justify-content:flex-start; margin-top:16px">
-          <button class="btn primary" data-go>시작하기</button>
+          <button class="btn primary" data-go${n ? "" : " disabled"}>시작하기</button>
         </div>
+        ${n ? "" : `<p class="hint">낼 낱말이 없습니다.</p>`}
       </div>
     </div>`;
-  Topics.chips(homeEl.querySelector("[data-topics]"));
+  Lang.switcher(homeEl.querySelector("[data-lang]"), draw);
+  if (!en) Topics.chips(homeEl.querySelector("[data-topics]"));
   homeEl.querySelector("[data-go]").onclick = () => { Sfx.select(); play(); };
 }
 
 function play() {
-  const run = buildWordRun(Topics.words(), COUNT);
+  const en = Lang.isEn();
+  const run = en ? buildEnWordRun(Lang.words(), COUNT) : buildWordRun(Topics.words(), COUNT);
+  Lang.apply();
   const lines = [];
   for (let i = 0; i < run.length; i += PER_LINE) lines.push(run.slice(i, i + PER_LINE).join(" "));
   homeEl.hidden = true;
   playEl.hidden = false;
   Trainer.start(playEl, {
-    title: `낱말 ${COUNT}개`,
+    title: `${en ? "영문 " : ""}낱말 ${COUNT}개`,
     backLabel: "돌아가기",
     lines,
     onQuit: home,
@@ -68,7 +77,7 @@ export function home() {
 }
 
 function finish(s) {
-  const fresh = Progress.record("words", { cpm: s.cpm, acc: s.acc });
+  const fresh = Progress.record(Lang.item("words"), { cpm: s.cpm, acc: s.acc });
   Sfx.win();
   playEl.innerHTML = `
     <div class="ty-done">

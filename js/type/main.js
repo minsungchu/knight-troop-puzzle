@@ -10,6 +10,7 @@ import * as Practice from "./practice.js";
 import * as Words from "./words.js";
 import * as Write from "./write.js";
 import * as Castle from "./castle.js";
+import * as Lang from "./lang.js";
 import * as Duel from "./duel.js";
 import { isTouch } from "./input.js";
 
@@ -41,7 +42,7 @@ if (isTouch() && Store.get(TIP) !== "1") {
   document.addEventListener("ty-keyboard", done);
 }
 
-Promise.all([Topics.load(), Texts.load()]).then(() => {
+Promise.all([Topics.load(), Texts.load(), Lang.load()]).then(() => {
   Practice.init(); Practice.drawMap();
   Words.init();    Words.draw();
   Write.init();    Write.draw();

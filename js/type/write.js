@@ -9,6 +9,7 @@ import * as Sfx from "../sound.js";
 import * as Progress from "./progress.js";
 import * as Topics from "./topics.js";
 import * as Texts from "./texts.js";
+import * as Lang from "./lang.js";
 import * as Trainer from "./trainer.js";
 import * as Writings from "./writings.js";
 import { createComposer } from "./composer.js";
@@ -88,6 +89,7 @@ function drawCopyList(body) {
 function playCopy(t) {
   homeEl.hidden = true;
   playEl.hidden = false;
+  Lang.ko();          // 글쓰기·대결은 한글 전용이다
   Trainer.start(playEl, {
     title: t.title,
     backLabel: "글 목록으로",

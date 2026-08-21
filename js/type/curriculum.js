@@ -168,3 +168,116 @@ export function shuffle(a) {
   }
   return a;
 }
+
+/* ══════════════ 영타 ══════════════
+ *
+ * 한글과 같은 뼈대를 쓴다 — 홈 자리에서 시작해 손가락을 넓히고, 배운 자리로 칠 수
+ * 있는 낱말을 섞어 넣는다. 다른 점은 조합이 없다는 것뿐이다. 글자 하나가 스트로크
+ * 하나여서 '받침'이나 '겹모음' 같은 단계가 필요 없고, 대신 대문자(shift)와
+ * 문장이 그 자리를 차지한다.
+ *
+ * 낱말은 data/type-en.json 에서 온다. 어느 단계에 나올지는 적어 두지 않는다 —
+ * 그 단계까지 배운 자리로 칠 수 있는지만 코드가 따진다. 자리를 옮기면 낱말도 저절로
+ * 따라 옮겨 간다.
+ */
+
+const L = (s) => s.split("");
+
+export const EN_STAGES = [
+  { n: 1,  title: "홈 자리",       sub: "a s d f · j k l — 여덟 손가락이 쉬는 자리", add: L("asdfjkl") },
+  { n: 2,  title: "검지 뻗기",     sub: "g 와 h — 검지를 안쪽으로",                  add: L("gh") },
+  { n: 3,  title: "윗줄 가운데",   sub: "e i r u — 검지·중지를 위로",                add: L("eiru") },
+  { n: 4,  title: "윗줄 끝",       sub: "q w o p t y",                               add: L("qwopty") },
+  { n: 5,  title: "아랫줄 가운데", sub: "c v m n — 손가락을 아래로",                 add: L("cvmn") },
+  { n: 6,  title: "아랫줄 끝",     sub: "z x b — 이제 자리를 다 배웠다",             add: L("zxb") },
+  { n: 7,  title: "대문자",        sub: "새끼손가락으로 shift 를 누른 채",           add: [], caps: true },
+  { n: 8,  title: "낱말",          sub: "뜻이 있는 말만 이어서",                     add: [], words: true },
+  { n: 9,  title: "짧은 문장",     sub: "사이 띄우기까지 한 흐름으로",               add: [], words: true, sentence: true },
+  { n: 10, title: "모두 모아",     sub: "대문자와 마침표까지 — 배운 것 전부",        add: [], caps: true, words: true, sentence: true, punct: true },
+];
+
+{
+  const seen = new Set();
+  for (const s of EN_STAGES) {
+    s.add.forEach((c) => seen.add(c));
+    s.all = new Set(seen);
+    if (!s.focus) s.focus = s.add;
+  }
+}
+
+export const enStageOf = (n) => EN_STAGES.find((s) => s.n === n) || null;
+
+/** 이 단계에서 그 낱말(또는 문장)을 칠 수 있는가. 사이 띄우기는 언제나 된다. */
+export function enFits(stage, text) {
+  for (const c of String(text).toLowerCase()) {
+    if (c === " ") continue;
+    if (!stage.all.has(c)) return false;
+  }
+  return true;
+}
+
+/** 배운 자리로 만든 뜻 없는 덩어리 하나. 낱말이 모자란 초반 단계를 메운다. */
+function enChunk(stage) {
+  const pool = [...stage.all];
+  const fresh = stage.focus.filter((c) => stage.all.has(c));
+  const len = 2 + Math.floor(Math.random() * 3);          // 두 자에서 네 자
+  const out = [];
+  for (let i = 0; i < len; i++) {
+    // 새로 배운 자리를 절반 넘게 끼워 넣는다 — 배우러 온 자리를 안 만나면 뜻이 없다
+    out.push(fresh.length && Math.random() < 0.55 ? pick(fresh) : pick(pool));
+  }
+  return out.join("");
+}
+
+const EN_LINES = 5;
+const EN_STROKES_PER_LINE = 26;
+
+/**
+ * 영타 한 단계의 문제를 만든다.
+ * @param {object} stage EN_STAGES 의 하나
+ * @param {{words:string[], sentences:string[]}} data data/type-en.json
+ * @returns {string[]} 줄 다섯
+ */
+export function buildEnStage(stage, data) {
+  const words = shuffle((data?.words || []).filter((w) => enFits(stage, w)));
+  const sentences = shuffle((data?.sentences || []).filter((s) => enFits(stage, s)));
+
+  const lines = [];
+  let wi = 0, si = 0;
+
+  for (let l = 0; l < EN_LINES; l++) {
+    /* 문장 단계는 문장을 그대로 한 줄로 쓴다. 문장은 사이 띄우기와 흐름을 배우는
+       것이라 잘라 쓰면 배울 것이 사라진다. */
+    if (stage.sentence && sentences.length && (l % 2 === 1 || !words.length)) {
+      let line = sentences[si++ % sentences.length];
+      if (stage.punct) line = line[0].toUpperCase() + line.slice(1) + pick([".", "!", "?"]);
+      lines.push(line);
+      continue;
+    }
+
+    const items = [];
+    let strokes = 0;
+    while (strokes < EN_STROKES_PER_LINE && items.length < MAX_ITEMS) {
+      /* 칠 수 있는 낱말이 많아질수록 낱말 쪽으로 기운다. 자리를 몇 개밖에 모르는
+         초반에는 걸리는 낱말이 적어 저절로 자리 연습이 된다. */
+      const odds = stage.words ? 1 : words.length >= 30 ? 0.8 : words.length >= 8 ? 0.6 : words.length ? 0.4 : 0;
+      let item = Math.random() < odds ? words[wi++ % words.length] : enChunk(stage);
+      // 대문자 단계에서는 몇 개를 첫 글자만 크게 — shift 를 자연스럽게 만나게 한다
+      if (stage.caps && Math.random() < 0.4) item = item[0].toUpperCase() + item.slice(1);
+      items.push(item);
+      strokes += item.length + 1;
+    }
+    let line = items.join(" ");
+    if (stage.punct && l % 2 === 0) line += pick([".", "?"]);
+    lines.push(line);
+  }
+  return lines;
+}
+
+/** 영타 낱말 연습 한 판 */
+export function buildEnWordRun(words, count) {
+  const list = shuffle((words || []).slice());
+  const out = [];
+  for (let i = 0; i < (count || 20); i++) out.push(list[i % list.length]);
+  return out;
+}

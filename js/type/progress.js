@@ -85,11 +85,12 @@ export function record(item, v) {
   return true;
 }
 
-export const stageStars = (n) => get("stage:" + n).stars;
+/** 단계 별. 영타는 이름 앞에 'en:' 이 붙어 한글 진도와 섞이지 않는다. */
+export const stageStars = (n, prefix) => get((prefix || "") + "stage:" + n).stars;
 
 /** 별을 하나라도 받은 마지막 단계 다음까지 열어 준다. 1단계는 늘 열려 있다. */
-export function unlockedThrough(stages) {
+export function unlockedThrough(stages, prefix) {
   let last = 1;
-  for (const s of stages) if (stageStars(s.n) > 0) last = Math.max(last, s.n + 1);
+  for (const s of stages) if (stageStars(s.n, prefix) > 0) last = Math.max(last, s.n + 1);
   return Math.min(last, stages.length);
 }

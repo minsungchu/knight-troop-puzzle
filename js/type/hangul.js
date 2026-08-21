@@ -52,11 +52,43 @@ const SYMBOLS = {
 /** 화면 자판이 이 표를 그대로 그린다 — 자리와 그림이 어긋날 일이 없다. */
 export { SYMBOLS };
 
+/* ── 영문 자판 ──
+ *
+ * 같은 자판, 다른 글자. 한글과 달리 조합이 없어 스트로크가 곧 글자 하나다 —
+ * 채점기는 이미 한글이 아닌 글자를 스트로크 하나로 다루므로 여기만 있으면 된다.
+ * 대문자는 shift 를 문 자리로 둔다. 운지와 손가락 색은 자리 기준이라 그대로 쓴다. */
+export const LATIN = (() => {
+  const m = {};
+  for (const c of "QWERTYUIOPASDFGHJKLZXCVBNM") m["Key" + c] = [c.toLowerCase(), c];
+  return m;
+})();
+
+/* 지금 어느 자판인가. 'ko' 아니면 'en'.
+   자리 익히기·낱말 화면이 이 값을 바꾼다 — 화면 자판의 글자, 눌린 키가 무엇이
+   되는지, 스트로크를 어느 키로 치는지가 모두 여기서 갈린다. */
+let LAYOUT = "ko";
+export const getLayout = () => LAYOUT;
+export function setLayout(v) {
+  const next = v === "en" ? "en" : "ko";
+  if (next === LAYOUT) return LAYOUT;
+  LAYOUT = next;
+  buildReverse();
+  return LAYOUT;
+}
+/** 지금 자판에서 이 자리의 [평소, shift] 글자. 기호 자리도 여기서 답한다. */
+export function pairOf(code) {
+  const main = LAYOUT === "en" ? LATIN[code] : KEYMAP[code];
+  return main || SYMBOLS[code] || null;
+}
+
 /* 스트로크 → 어느 키를 눌러야 하나.
-   한글 자리를 먼저 넣는다 — 같은 키에 자모와 기호가 겹칠 때 자모가 이긴다. */
-const REVERSE = (() => {
+   글자 자리를 먼저 넣는다 — 같은 키에 글자와 기호가 겹칠 때 글자가 이긴다.
+   자판을 바꾸면 다시 만든다. */
+let REVERSE = new Map();
+function buildReverse() {
   const m = new Map();
-  for (const [code, [plain, shifted]] of Object.entries(KEYMAP)) {
+  const main = LAYOUT === "en" ? LATIN : KEYMAP;
+  for (const [code, [plain, shifted]] of Object.entries(main)) {
     if (!m.has(plain)) m.set(plain, { code, shift: false });
     if (!m.has(shifted)) m.set(shifted, { code, shift: true });
   }
@@ -66,8 +98,9 @@ const REVERSE = (() => {
   }
   m.set(" ", { code: "Space", shift: false });
   m.set("\n", { code: "Enter", shift: false });
-  return m;
-})();
+  REVERSE = m;
+}
+buildReverse();
 
 /** 이 스트로크를 치려면 어느 키를 어떻게 눌러야 하는가. 모르면 null. */
 export function keyFor(stroke) { return REVERSE.get(stroke) || null; }
@@ -76,8 +109,8 @@ export function keyFor(stroke) { return REVERSE.get(stroke) || null; }
  *  한글 자리가 먼저다 — Comma·Period·Slash 처럼 둘 다 있는 자리는 없지만,
  *  나중에 겹치더라도 자모 쪽이 이기도록 순서를 이렇게 둔다. */
 export function strokeFor(code, shift) {
-  const jamo = KEYMAP[code];
-  if (jamo) return jamo[shift ? 1 : 0];
+  const main = LAYOUT === "en" ? LATIN[code] : KEYMAP[code];
+  if (main) return main[shift ? 1 : 0];
   const sym = SYMBOLS[code];
   if (sym) return sym[shift ? 1 : 0];
   if (code === "Space") return " ";

@@ -17,6 +17,7 @@ import * as Sfx from "../sound.js";
 import * as KB from "./keyboard.js";
 import * as Topics from "./topics.js";
 import * as Texts from "./texts.js";
+import * as Lang from "./lang.js";
 import * as Trainer from "./trainer.js";
 import { capture } from "./input.js";
 import { analyze } from "./hangul.js";
@@ -322,6 +323,7 @@ function paintScore() {
 /* ── 글쓰기 대결 ── */
 
 function beginWrite(plan) {
+  Lang.ko();          // 글쓰기·대결은 한글 전용이다
   match = Trainer.start(body, {
     title: `${MODES.write.name} · ${plan.title}`,
     backLabel: "기권하고 나가기",

@@ -9,6 +9,7 @@
 import { $ } from "../ui.js";
 import * as Sfx from "../sound.js";
 import * as KB from "./keyboard.js";
+import * as Lang from "./lang.js";
 import * as Progress from "./progress.js";
 import * as Topics from "./topics.js";
 import { shuffle } from "./curriculum.js";
@@ -66,6 +67,7 @@ export function home() {
 export function stop() { game?.field.stop(); game = null; }
 
 function play() {
+  Lang.ko();          // 성 지키기는 한글 낱말만 쓴다
   homeEl.hidden = true;
   playEl.hidden = false;
   playEl.innerHTML = `
