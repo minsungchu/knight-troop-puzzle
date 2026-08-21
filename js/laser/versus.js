@@ -23,6 +23,9 @@ let idx = 0;              // 몇 번째 판을 풀고 있나
 let startedAt = 0;
 let poll = null;
 let myRating = BASE;
+let playing = false;      // 판을 붙잡고 있는 중인가 — 대전 화면을 두 번 세우지 않으려고 둔다
+let deltas = null;        // 서버가 돌려준 점수 증감 (먼저 끝낸 사람만 받는다)
+let shown = false;        // 결과를 이미 띄웠나
 
 const TIER = { low: "하", mid: "중", high: "상" };
 
@@ -183,11 +186,21 @@ async function refresh() {
   try {
     const { data, error } = await (await client()).rpc("laser_room_state", { p_room: room.id });
     if (error) throw error;
-    const was = room.status;
     room = { ...data, id: data.id };
-    if (room.status === "playing" && was !== "playing") beginMatch();
-    else if (room.status === "playing") paintScoreboard();
-    else renderRoom();
+
+    /* 세 가지 상태를 각각 다룬다. 예전에는 '진행 중이 아니면 대기실'로 뭉뚱그렸는데,
+       그러면 먼저 끝낸 사람 때문에 방이 닫히는 순간 아직 풀고 있던 사람의 판이
+       대기실 화면으로 덮여 버린다 — 진 사람은 자기가 왜 끝났는지도 못 본다. */
+    if (room.status === "playing") {
+      if (playing) paintScoreboard(); else beginMatch();
+    } else if (room.status === "finished") {
+      endMatch();
+    } else {
+      if (playing) stopMatch();
+      shown = false;          // 한 판 더 — 다음 판이 끝나면 결과를 다시 띄운다
+      deltas = null;
+      renderRoom();
+    }
   } catch (e) {
     console.warn(e);
     leaveLocal();
@@ -275,11 +288,25 @@ async function start() {
 /* ══════════════ 대전 진행 ══════════════ */
 
 function beginMatch() {
+  board?.destroy();
+  board = null;
+  playing = true;
+  deltas = null;
+  shown = false;
   boards = JSON.parse(room.boards || "[]");
   idx = 0;
   startedAt = performance.now();
   renderMatch();
   openBoard();
+}
+
+/** 판을 놓는다. 시계도 판도 여기서 한 번에 걷는다. */
+function stopMatch() {
+  playing = false;
+  clearInterval(poll);
+  poll = null;
+  board?.destroy();
+  board = null;
 }
 
 function renderMatch() {
@@ -362,28 +389,96 @@ async function onBoardWin() {
   }
 
   // 다 깼다
-  clearInterval(poll);
   const ms = Math.round(performance.now() - startedAt);
-  let deltas = [];
   try {
     const { data } = await (await client()).rpc("laser_room_finish", { p_room: room.id, p_ms: ms });
-    deltas = data || [];
+    deltas = data || null;
   } catch (e) { console.warn(e); }
   shout("state");
-  showResult(ms, deltas);
+  await refresh();       // 방이 닫혔는지 확인하고 결과로 넘어간다
 }
 
-function showResult(ms, deltas) {
-  const mine = deltas.find((d) => d.id === uid());
-  const won = mine && mine.pos === 1;
-  $("#vsDone").hidden = false;
-  $("#vsDone").innerHTML =
-    `<b>${won ? "이겼습니다" : "다 깼습니다"}</b> — ${(ms / 1000).toFixed(1)}초` +
-    (mine ? `<div style="margin-top:6px">${gradeName(mine.before)} ${mine.before}점 →
-       <b>${gradeName(mine.after)} ${mine.after}점</b> (${mine.delta >= 0 ? "+" : ""}${mine.delta})</div>` : "") +
-    `<div class="lz-bar" style="justify-content:center"><button id="vsBack">방 목록으로</button></div>`;
-  $("#vsBack").onclick = leaveLocal;
+/* ══════════════ 결과 ══════════════ */
+
+/** 방이 닫혔다. 이긴 쪽이든 진 쪽이든 여기로 온다. */
+function endMatch() {
+  if (shown) return;
+  shown = true;
+  stopMatch();
+  paintResult();
   loadRating();
+  // 방은 아직 살아 있다 — 방장이 한 판 더 하면 따라 들어가야 한다
+  poll = setInterval(refresh, 4000);
+}
+
+/** 등수 — 다 깬 사람은 걸린 시간 순, 못 깬 사람은 깬 판 수 역순. 서버가 점수를 매기는 규칙과 같다. */
+function standing() {
+  const ps = [...(room.players || [])].sort((a, b) => {
+    const ad = a.finish_ms != null, bd = b.finish_ms != null;
+    if (ad !== bd) return ad ? -1 : 1;
+    if (ad && bd) return a.finish_ms - b.finish_ms;
+    return (b.solved || 0) - (a.solved || 0);
+  });
+  let pos = 0, prev = null;
+  return ps.map((p, i) => {
+    const k = p.finish_ms != null ? "d" + p.finish_ms : "s" + (p.solved || 0);
+    if (k !== prev) { pos = i + 1; prev = k; }
+    return { ...p, pos };
+  });
+}
+
+function paintResult() {
+  const rows = standing();
+  const total = boards.length || (room.n_low + room.n_mid + room.n_high);
+  const mine = rows.find((p) => p.id === uid());
+  const won = mine?.pos === 1;
+  // 점수 증감은 방을 닫은 사람만 답으로 받는다. 나머지는 방에 적힌 것을 본다.
+  const d = (deltas || room.result || []).find((x) => x.id === uid());
+  const host = room.host === uid();
+
+  $("#vsBody").innerHTML =
+    `<div class="lz-bar">
+       <button id="vsLeave">◂ 방 목록으로</button>
+       <strong style="font-family:var(--display); font-size:17px">${esc(room.title)}</strong>
+       <span style="flex:1"></span>
+       ${host ? `<button id="vsAgain" class="on">한 판 더</button>`
+              : `<span class="hint">방장이 다시 시작하면 이어서 합니다</span>`}
+     </div>
+     <div class="panel">
+       <h2>${rows.length < 2 ? "혼자 남았습니다" : won ? "이겼습니다" : "졌습니다"}</h2>
+       <div class="hint">${rows.length < 2 ? "상대가 도중에 나갔습니다. 급수는 움직이지 않습니다."
+         : won ? "먼저 전부 깼습니다." : "상대가 먼저 전부 깼습니다."}</div>
+       <table><thead><tr><th>등수</th><th>이름</th><th>깬 판</th><th>걸린 시간</th></tr></thead>
+         <tbody>${rows.map((p) => `<tr>
+           <td class="num">${p.pos}</td>
+           <td>${esc(p.name)}${p.id === uid() ? " <span class='hint'>(나)</span>" : ""}</td>
+           <td class="num">${p.solved} / ${total}</td>
+           <td class="num">${p.finish_ms != null ? (p.finish_ms / 1000).toFixed(1) + "초" : "—"}</td>
+         </tr>`).join("")}</tbody></table>
+     </div>
+     <div class="panel">
+       <h2>급수</h2>
+       ${d ? `<div>${gradeName(d.before)} ${d.before}점 →
+          <b>${gradeName(d.after)} ${d.after}점</b> (${d.delta >= 0 ? "+" : ""}${d.delta})</div>` : ""}
+       <div id="vsRating" class="hint"></div>
+     </div>`;
+
+  $("#vsLeave").onclick = leave;
+  paintRating({ rating: myRating, wins: 0, losses: 0 });
+
+  const again = $("#vsAgain");
+  if (again) again.onclick = async () => {
+    again.disabled = true;
+    try {
+      const { error } = await (await client()).rpc("laser_room_rematch", { p_room: room.id });
+      if (error) throw error;
+      shout("state");
+      await refresh();
+    } catch (e) {
+      again.disabled = false;
+      toast(e.message || "다시 시작하지 못했습니다.");
+    }
+  };
 }
 
 /* ══════════════ 나가기 ══════════════ */
@@ -395,11 +490,11 @@ async function leave() {
 }
 
 function leaveLocal() {
-  clearInterval(poll);
+  stopMatch();
   closeChannel();
-  board?.destroy();
-  board = null;
   room = null;
   boards = [];
+  deltas = null;
+  shown = false;
   renderLobby();
 }

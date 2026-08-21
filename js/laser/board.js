@@ -37,7 +37,11 @@ export class LaserBoard {
     this.board = null;
     this.won = false;
 
-    host.addEventListener("pointerdown", (e) => this.onPress(e));
+    /* 뗄 수 있게 붙들어 둔다. 대전은 판을 넘길 때마다 같은 자리에 새 판을 얹는데,
+       듣던 것을 안 떼면 지난 판이 살아남아 같은 자리를 자기 그림으로 다시 칠한다.
+       그러면 새 판에 거울을 놓아도 곧바로 지워져 클릭이 먹지 않는 것처럼 보인다. */
+    this.press = (e) => this.onPress(e);
+    host.addEventListener("pointerdown", this.press);
 
     /* 폭 변화는 window resize 가 아니라 자리 자체를 지켜본다. 화면 회전이나 글꼴
        로딩처럼 창 크기는 그대로인데 쓸 수 있는 폭만 바뀌는 경우가 있다.
@@ -55,7 +59,14 @@ export class LaserBoard {
     this.watch.observe(this.room);
   }
 
-  destroy() { this.watch.disconnect(); }
+  /** 판을 걷는다. 자리에 붙여 둔 것과 알림받을 곳까지 전부 끊는다 —
+      끊지 않으면 이미 사라진 화면에 그리려 들어 오류가 난다. */
+  destroy() {
+    this.watch.disconnect();
+    this.host.removeEventListener("pointerdown", this.press);
+    this.opts = {};
+    this.board = null;
+  }
 
   load(data) {
     this.data = data;

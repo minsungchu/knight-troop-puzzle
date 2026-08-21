@@ -1,9 +1,16 @@
 /* 레이저 미로 — 판과 등반 지도 */
 
 .lz-stage{display:flex; justify-content:center; padding:22px 0 8px; perspective:1400px}
-.lz-board{position:relative; transform:rotateX(14deg); transform-style:preserve-3d;
+
+/* 기울기는 두되 3차원으로 세우지는 않는다(transform-style 을 preserve-3d 로 두지 않는다).
+   기울어진 판을 3차원으로 세우면 브라우저가 아래쪽 절반의 칸을 눌러도 잡아내지 못한다.
+   재 보면 6×6 판의 36칸 중 18칸 — 정확히 회전축 아래쪽 전부 — 이 화면 어디를 눌러도
+   반응하지 않았다. 판의 절반을 못 쓰면 대부분의 문제는 아예 풀 수 없다.
+   평평하게 두면 보이는 기울기는 그대로이면서 36칸이 모두 살아난다.
+   받침대의 깊이(translateZ)도 그래서 뺐다 — 테두리와 그림자만으로 충분히 받침대로 보인다. */
+.lz-board{position:relative; transform:rotateX(14deg);
   --cell:56px; --gap:4px; --plinth:18px}
-.lz-plinth{position:absolute; inset:calc(var(--plinth) * -1); border-radius:12px; transform:translateZ(-14px);
+.lz-plinth{position:absolute; inset:calc(var(--plinth) * -1); border-radius:12px;
   background:linear-gradient(160deg,#1b2b42,#0d1626 60%); border:1px solid rgba(201,151,63,.3);
   box-shadow:0 36px 64px rgba(0,0,0,.62), inset 0 0 60px rgba(0,0,0,.5)}
 
