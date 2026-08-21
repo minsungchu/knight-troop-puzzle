@@ -119,8 +119,13 @@ export class LaserBoard {
     const gap = narrow ? 3 : 4;
     const plinth = narrow ? 10 : 18;
     const max = W >= 9 ? 46 : 56;
+    /* 광원이 판 옆(x = -1 또는 W)에 서면 격자 밖으로 한 칸이 더 나간다. 그 몫을
+       비워 두지 않으면 좁은 화면에서 광원이 화면 밖으로 잘려 어디서 빛이 오는지
+       보이지 않는다. 판은 가운데 정렬이라 양쪽에 한 칸씩, 두 칸을 뺀다. */
+    const sx = this.board.src ? this.board.src.x : 0;
+    const cols = W + (sx < 0 || sx >= W ? 2 : 0);
     // 받침대 테두리 1px 과 반올림 오차 때문에 2px 을 더 비워 둔다
-    const cell = Math.max(18, Math.min(max, Math.floor((room - plinth * 2 - 2) / W)));
+    const cell = Math.max(18, Math.min(max, Math.floor((room - plinth * 2 - 2) / cols)));
     const s = this.host.style;
     s.setProperty("--cell", cell + "px");
     s.setProperty("--gap", gap + "px");

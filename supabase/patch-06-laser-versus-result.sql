@@ -164,3 +164,46 @@ begin
 end $$;
 
 grant execute on function public.laser_room_rematch(uuid) to authenticated;
+
+/* ══════════════ 방 이름 ══════════════ */
+
+/* 이름을 안 적으면 '하늘 의 방' 처럼 조사 앞이 띄어져 있었다. 붙여 쓴다.
+   나머지는 patch-03 과 같다. */
+create or replace function public.laser_room_create(
+  p_title text, p_private boolean, p_join_code text,
+  p_max int, p_low int, p_mid int, p_high int
+) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare me uuid := auth.uid(); nm text; c text; r public.laser_rooms;
+begin
+  if me is null then raise exception '로그인이 필요합니다'; end if;
+  select username into nm from public.profiles where id = me;
+  if nm is null then raise exception '프로필을 찾을 수 없습니다'; end if;
+  if coalesce(p_low,0) + coalesce(p_mid,0) + coalesce(p_high,0) not between 1 and 10 then
+    raise exception '판 수는 모두 합쳐 1~10 이어야 합니다';
+  end if;
+  if p_private and coalesce(length(trim(p_join_code)), 0) < 4 then
+    raise exception '비밀방 암호는 4자 이상이어야 합니다';
+  end if;
+
+  -- 한 사람이 기다리는 방을 여러 개 열어 두지 못하게 한다
+  delete from public.laser_rooms where host_id = me and status = 'waiting';
+
+  loop
+    c := upper(substr(md5(gen_random_uuid()::text), 1, 6));
+    exit when not exists (select 1 from public.laser_rooms where code = c);
+  end loop;
+
+  insert into public.laser_rooms (code, host_id, title, is_private, join_code,
+                                  max_players, n_low, n_mid, n_high)
+  values (c, me, coalesce(nullif(trim(p_title), ''), nm || '의 방'),
+          coalesce(p_private, false), case when p_private then trim(p_join_code) end,
+          greatest(2, least(4, coalesce(p_max, 2))),
+          coalesce(p_low,0), coalesce(p_mid,0), coalesce(p_high,0))
+  returning * into r;
+
+  insert into public.laser_room_players (room_id, user_id, username, seat)
+  values (r.id, me, nm, 0);
+
+  return jsonb_build_object('id', r.id, 'code', r.code);
+end $$;
