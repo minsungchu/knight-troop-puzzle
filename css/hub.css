@@ -2,7 +2,9 @@
 
 .hub{
   display:grid; gap:18px; margin-top:26px;
-  grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));
+  /* 320px 을 그대로 밑값으로 두면 320px 폰에서 칸이 화면보다 넓어져 가로로 밀린다.
+     쓸 수 있는 폭보다 커지지 않게 막는다. */
+  grid-template-columns:repeat(auto-fit, minmax(min(320px, 100%), 1fr));
 }
 
 .game-card{

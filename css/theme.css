@@ -99,6 +99,10 @@ select{min-width:74px}
 }
 /* 화면이 낮으면 머리글이 본문을 밀어낸다. 폰을 가로로 눕혔을 때나 작은 폰에서는
    게임판·자판이 먼저 보여야 하므로 제목 줄을 접는다. */
+/* 손가락으로 누르는 화면에서는 단추가 손끝만 해야 한다. 기본 높이 31px 은 작다. */
+@media (max-width:780px){
+  select,.btn{min-height:40px; padding:9px 13px; font-size:13.5px}
+}
 @media (max-height:720px){
   .masthead{padding-bottom:9px; gap:8px 16px}
   .brand h1{font-size:clamp(18px,3vw,24px)}
