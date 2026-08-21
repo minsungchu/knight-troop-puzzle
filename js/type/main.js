@@ -30,7 +30,15 @@ const TIP = "type-touch-tip:v1";
 if (isTouch() && Store.get(TIP) !== "1") {
   const box = $("#tyNeedKeyboard");
   box.hidden = false;
-  $("#tyTipOk").onclick = () => { box.hidden = true; Store.set(TIP, "1"); };
+  const done = () => { box.hidden = true; Store.set(TIP, "1"); };
+  $("#tyTipOk").onclick = done;
+  /* 화면 자판을 한 번 누르면 그걸로 안 것이다. 읽었다고 눌러 주기를 기다리면
+     상자가 계속 자리를 차지하고, 짧은 화면에서는 그만큼 자판이 아래로 밀린다. */
+  document.addEventListener("pointerdown", (e) => {
+    if (e.target.closest && e.target.closest(".ty-k")) done();
+  }, { capture: true });
+  // 자판이 화면에 서면 안내는 제 몫을 다했다. 눈앞에 있는 것을 더 설명할 이유가 없다.
+  document.addEventListener("ty-keyboard", done);
 }
 
 Promise.all([Topics.load(), Texts.load()]).then(() => {

@@ -269,6 +269,9 @@ const chosenTopics = () => {
 /* ══════════════ 진행 ══════════════ */
 
 function beginMatch() {
+  /* 좁은 화면에서 대결 화면만 자판을 밖으로 밀어낸다 — 진행 막대가 한 덩이 더 붙기
+     때문이다. 표시를 하나 걸어 두고, 그때만 덜 중요한 줄을 접는다. */
+  body.classList.add("ty-duel-play");
   const plan = JSON.parse(room.payload || "{}");
   startedAt = performance.now();
   myProgress = 0;
@@ -460,6 +463,7 @@ async function leave() {
 }
 
 function leaveLocal() {
+  body?.classList.remove("ty-duel-play");
   clearInterval(poll);
   poll = null;
   pending = null;

@@ -94,6 +94,10 @@ function strokeOf(key, sticky) {
 
 /** 컨테이너 안에 자판을 그린다. 여러 번 불러도 된다. */
 export function render(el, opts = {}) {
+  /* 자판이 화면에 섰다는 것을 알린다. '화면 자판을 눌러 치세요' 안내 상자는
+     이 순간부터 자리만 차지한다 — 짧은 폰에서는 그 상자 때문에 정작 자판이
+     화면 밖으로 밀려나, 안내하려던 것을 눌러 볼 수조차 없었다. */
+  document.dispatchEvent(new CustomEvent("ty-keyboard"));
   const compact = opts.compact ?? isNarrow();
   const prev = state.get(el);
   const st = { compact, layer: prev && prev.compact === compact ? prev.layer : "main",
