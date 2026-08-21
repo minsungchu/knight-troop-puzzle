@@ -19,6 +19,7 @@ let live = {};           // user_id → { filled, hints, done, ms, rank }
 let online = new Set();  // presence 로 확인된 접속자
 let presenceSynced = false;
 let lobbyTimer = null;
+let roomTimer = null;    // 실시간이 끊겨도 방이 멈추지 않게 하는 느슨한 재확인
 let countdownTimer = null;
 let base = 0;            // 처음부터 주어진 칸 수 — 게이지는 각자 푼 몫만 잰다
 
@@ -310,6 +311,13 @@ async function enterRoom(id, opts) {
 
 async function openChannel() {
   closeChannel();
+
+  /* 방 상태를 실시간 방송에만 기대면, 그 연결이 한 번 끊기는 순간 방이 통째로
+     멈춘다 — 친구가 들어와도 안 보이고, 방장이 시작해도 따라가지 못한다.
+     폰에서는 화면을 껐다 켜는 것만으로도 연결이 끊긴다. 느슨하게 다시 확인한다. */
+  clearInterval(roomTimer);
+  roomTimer = setInterval(() => { if (R) refreshState(); }, 5000);
+
   const sb = await client();
   chan = sb.channel(`room:${R.id}`, {
     config: { broadcast: { self: false }, presence: { key: uid() } },
@@ -361,6 +369,8 @@ async function openChannel() {
 function closeChannel() {
   if (chan) { chan.unsubscribe(); chan = null; }
   presenceSynced = false;
+  clearInterval(roomTimer);
+  roomTimer = null;
   clearTimeout(countdownTimer);
 }
 
