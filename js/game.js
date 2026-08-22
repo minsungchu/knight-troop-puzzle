@@ -77,9 +77,31 @@ function init() {
   bindEvents();
 }
 
+/* 판은 기울여 그린다. 그런데 기울어진 3차원 판에서는 브라우저가 칸 하나하나를
+   정확히 집어내지 못한다 — 재 보면 8×8 판의 64칸 가운데 열댓 칸이 한가운데를
+   눌러도 판(.grid)만 잡히고 칸은 잡히지 않았다. 좁은 화면일수록 더 많이 빗나간다.
+   그 칸들은 아이가 아무리 눌러도 반응하지 않으니 판을 채울 수가 없다.
+
+   그래서 눈에 보이는 자리로 고른다 — 칸을 못 집었으면 누른 곳에서 가장 가까운
+   칸을 그 칸으로 친다. 아이는 보이는 것을 누른 것이고, 보이는 자리는 화면 좌표다. */
+function tileFrom(e) {
+  const direct = e.target.closest(".tile");
+  if (direct) return direct;
+  if (!e.target.closest("#grid")) return null;
+  let best = null, bestD = Infinity;
+  for (const t of $("#grid").querySelectorAll(".tile")) {
+    const r = t.getBoundingClientRect();
+    const dx = e.clientX - (r.left + r.width / 2);
+    const dy = e.clientY - (r.top + r.height / 2);
+    const d = dx * dx + dy * dy;
+    if (d < bestD) { bestD = d; best = t; }
+  }
+  return best;
+}
+
 function bindEvents() {
   $("#grid").addEventListener("click", (e) => {
-    const c = e.target.closest(".c"), t = e.target.closest(".tile");
+    const c = e.target.closest(".c"), t = tileFrom(e);
     if (!t) return;
     const i = +t.dataset.i;
     if (c && !S.values[i]) {
@@ -95,7 +117,7 @@ function bindEvents() {
   // 칸이 바뀔 때만 울린다 — 한 칸 안에서 움직이는 동안 계속 나면 시끄럽다
   let hoverAt = -1;
   $("#grid").addEventListener("pointermove", (e) => {
-    const t = e.target.closest(".tile");
+    const t = tileFrom(e);
     const i = t ? +t.dataset.i : -1;
     if (i !== hoverAt) { hoverAt = i; if (i >= 0) Sfx.hover(); }
   });

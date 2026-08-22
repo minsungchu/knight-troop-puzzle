@@ -9,7 +9,9 @@
  *
  * 그래서 키를 직접 받는다. 키보드가 영문 상태여도 한글이 나오고, 낱자 하나하나를
  * 채점할 수 있으며, "다음은 왼손 검지" 같은 안내도 가능해진다.
- * 대신 물리 키보드가 필요하다 — 모바일 화면 키보드로는 못 논다.
+ * 자판이 없는 기기에서도 같은 길로 간다. 화면 자판(keyboard.js)을 손가락으로 누른
+ * 것도 '어느 자리를 눌렀나'로 바뀌어 여기로 들어오므로, 폰이든 컴퓨터든 아래쪽
+ * 코드는 하나뿐이다. 브라우저 조합기를 안 쓴 덕에 터치가 거저 붙었다.
  *
  * 핵심 발상: 지문은 미리 '스트로크 열'로 풀어 둔다.
  *   "값" → [ㄱ, ㅏ, ㅂ, ㅅ]      (겹받침은 두 번 누른다)
@@ -30,38 +32,89 @@ export const KEYMAP = {
   KeyB: ["ㅠ", "ㅠ"], KeyN: ["ㅜ", "ㅜ"], KeyM: ["ㅡ", "ㅡ"],
 };
 
-/* 한글이 아닌 스트로크(공백·문장부호)도 같은 방식으로 자리를 찾아 준다. */
-const PUNCT = {
-  " ": { code: "Space", shift: false },
-  ".": { code: "Period", shift: false },
-  ",": { code: "Comma", shift: false },
-  "?": { code: "Slash", shift: true },
-  "!": { code: "Digit1", shift: true },
+/* 한글이 아닌 자리 — 숫자줄과 문장부호.
+ *
+ * 자리 익히기만 생각하면 없어도 됐다. 글쓰기를 붙이면서 반드시 필요해졌다.
+ * 아이가 자유롭게 글을 쓸 때는 목표 지문이 없으므로 무엇을 누르든 그대로 나와야
+ * 하는데, 느낌표 하나를 못 받으면 "신난다!"에서 손이 멈춘다.
+ *
+ * 그래서 자판에 있는 것은 다 받는다. 배열은 미국식 QWERTY 그대로다. */
+const SYMBOLS = {
+  Backquote: ["`", "~"],
+  Digit1: ["1", "!"], Digit2: ["2", "@"], Digit3: ["3", "#"], Digit4: ["4", "$"], Digit5: ["5", "%"],
+  Digit6: ["6", "^"], Digit7: ["7", "&"], Digit8: ["8", "*"], Digit9: ["9", "("], Digit0: ["0", ")"],
+  Minus: ["-", "_"], Equal: ["=", "+"],
+  BracketLeft: ["[", "{"], BracketRight: ["]", "}"], Backslash: ["\\", "|"],
+  Semicolon: [";", ":"], Quote: ["'", '"'],
+  Comma: [",", "<"], Period: [".", ">"], Slash: ["/", "?"],
 };
 
-/* 스트로크 → 어느 키를 눌러야 하나 */
-const REVERSE = (() => {
+/** 화면 자판이 이 표를 그대로 그린다 — 자리와 그림이 어긋날 일이 없다. */
+export { SYMBOLS };
+
+/* ── 영문 자판 ──
+ *
+ * 같은 자판, 다른 글자. 한글과 달리 조합이 없어 스트로크가 곧 글자 하나다 —
+ * 채점기는 이미 한글이 아닌 글자를 스트로크 하나로 다루므로 여기만 있으면 된다.
+ * 대문자는 shift 를 문 자리로 둔다. 운지와 손가락 색은 자리 기준이라 그대로 쓴다. */
+export const LATIN = (() => {
+  const m = {};
+  for (const c of "QWERTYUIOPASDFGHJKLZXCVBNM") m["Key" + c] = [c.toLowerCase(), c];
+  return m;
+})();
+
+/* 지금 어느 자판인가. 'ko' 아니면 'en'.
+   자리 익히기·낱말 화면이 이 값을 바꾼다 — 화면 자판의 글자, 눌린 키가 무엇이
+   되는지, 스트로크를 어느 키로 치는지가 모두 여기서 갈린다. */
+let LAYOUT = "ko";
+export const getLayout = () => LAYOUT;
+export function setLayout(v) {
+  const next = v === "en" ? "en" : "ko";
+  if (next === LAYOUT) return LAYOUT;
+  LAYOUT = next;
+  buildReverse();
+  return LAYOUT;
+}
+/** 지금 자판에서 이 자리의 [평소, shift] 글자. 기호 자리도 여기서 답한다. */
+export function pairOf(code) {
+  const main = LAYOUT === "en" ? LATIN[code] : KEYMAP[code];
+  return main || SYMBOLS[code] || null;
+}
+
+/* 스트로크 → 어느 키를 눌러야 하나.
+   글자 자리를 먼저 넣는다 — 같은 키에 글자와 기호가 겹칠 때 글자가 이긴다.
+   자판을 바꾸면 다시 만든다. */
+let REVERSE = new Map();
+function buildReverse() {
   const m = new Map();
-  for (const [code, [plain, shifted]] of Object.entries(KEYMAP)) {
+  const main = LAYOUT === "en" ? LATIN : KEYMAP;
+  for (const [code, [plain, shifted]] of Object.entries(main)) {
     if (!m.has(plain)) m.set(plain, { code, shift: false });
     if (!m.has(shifted)) m.set(shifted, { code, shift: true });
   }
-  for (const [ch, v] of Object.entries(PUNCT)) m.set(ch, v);
-  return m;
-})();
+  for (const [code, [plain, shifted]] of Object.entries(SYMBOLS)) {
+    if (!m.has(plain)) m.set(plain, { code, shift: false });
+    if (!m.has(shifted)) m.set(shifted, { code, shift: true });
+  }
+  m.set(" ", { code: "Space", shift: false });
+  m.set("\n", { code: "Enter", shift: false });
+  REVERSE = m;
+}
+buildReverse();
 
 /** 이 스트로크를 치려면 어느 키를 어떻게 눌러야 하는가. 모르면 null. */
 export function keyFor(stroke) { return REVERSE.get(stroke) || null; }
 
-/** 눌린 키 → 스트로크. 자판에 없는 키면 null. */
+/** 눌린 키 → 스트로크. 자판에 없는 키면 null.
+ *  한글 자리가 먼저다 — Comma·Period·Slash 처럼 둘 다 있는 자리는 없지만,
+ *  나중에 겹치더라도 자모 쪽이 이기도록 순서를 이렇게 둔다. */
 export function strokeFor(code, shift) {
-  const pair = KEYMAP[code];
-  if (pair) return pair[shift ? 1 : 0];
+  const main = LAYOUT === "en" ? LATIN[code] : KEYMAP[code];
+  if (main) return main[shift ? 1 : 0];
+  const sym = SYMBOLS[code];
+  if (sym) return sym[shift ? 1 : 0];
   if (code === "Space") return " ";
-  if (code === "Period" && !shift) return ".";
-  if (code === "Comma" && !shift) return ",";
-  if (code === "Slash" && shift) return "?";
-  if (code === "Digit1" && shift) return "!";
+  if (code === "Enter") return "\n";
   return null;
 }
 

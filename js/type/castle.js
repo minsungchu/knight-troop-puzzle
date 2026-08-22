@@ -1,38 +1,31 @@
-/* 성 지키기 — 낱말을 쳐서 몰려오는 적을 막는다.
+/* 성 지키기 — 혼자 하는 판.
  *
- * 표적은 늘 '성에 가장 가까운 적' 하나다. 아이에게 표적을 고르게 하면 어느 적을
- * 치는 중이었는지 놓치고 손이 멈춘다. 자동으로 잡아 주면 아이는 글자만 보면 된다.
- *
- * 틀린 자리는 넘어가지 않는다. 연습 화면과 같은 규칙이라야 아이가 헷갈리지 않는다.
- * 대신 게임에서는 벌이 하나 더 붙는다 — 연속 처치 배수가 끊긴다.
+ * 판 자체는 castlefield.js 가 굴린다. 여기서 정하는 것은 '어떤 적이 언제 오는가'
+ * 뿐이다 — 물결이 거듭될수록 낱말이 길어지고 빨라진다.
  *
  * 속도는 넉넉히 잡았다. 이제 배우는 아이는 분당 40~60타쯤 치므로 세 글자 낱말에
  * 10초 남짓 걸린다. 첫 물결은 성까지 30초를 준다.
  */
-import { $, esc } from "../ui.js";
+import { $ } from "../ui.js";
 import * as Sfx from "../sound.js";
-import { createRun } from "./engine.js";
-import { lineHTML } from "./paint.js";
 import * as KB from "./keyboard.js";
-import { capture } from "./input.js";
+import * as Lang from "./lang.js";
 import * as Progress from "./progress.js";
 import * as Topics from "./topics.js";
 import { shuffle } from "./curriculum.js";
-import { analyze } from "./hangul.js";
+import { run, CASTLE_SVG, hearts } from "./castlefield.js";
 
 const MAX_HP = 5;
-const ALIVE_CAP = 5;
 
 /* 물결이 거듭될수록 빨라지고 길어진다 */
 const wave = (n) => ({
   count: 4 + n,
   cross: Math.max(12, 30 - 1.6 * (n - 1)),     // 성까지 걸리는 초
-  gap: Math.max(1.6, 3.6 - 0.18 * (n - 1)),    // 적이 나오는 간격
+  gap: Math.max(1.6, 3.4 - 0.18 * (n - 1)),    // 적이 나오는 간격
   maxLen: n <= 2 ? 3 : n <= 5 ? 4 : 5,         // 낱말 글자 수 상한
 });
 
-let homeEl, playEl;
-let game = null;
+let homeEl, playEl, game = null;
 
 export function init() {
   homeEl = $("#tyGameHome");
@@ -62,9 +55,19 @@ export function draw() {
   homeEl.querySelector("[data-go]").onclick = () => { Sfx.select(); play(); };
 }
 
-/* ── 한 판 ── */
+export function home() {
+  if (!homeEl) return;
+  stop();
+  playEl.hidden = true;
+  playEl.innerHTML = "";
+  homeEl.hidden = false;
+  draw();
+}
+
+export function stop() { game?.field.stop(); game = null; }
 
 function play() {
+  Lang.ko();          // 성 지키기는 한글 낱말만 쓴다
   homeEl.hidden = true;
   playEl.hidden = false;
   playEl.innerHTML = `
@@ -79,212 +82,81 @@ function play() {
       <span>점수<b data-score>0</b></span>
       <span>연속<b data-combo>×1.0</b></span>
     </div>
-    <div class="ty-field" data-field>
-      <div class="ty-castle">
-        <svg viewBox="0 0 60 80" aria-hidden="true">
-          <rect x="6" y="30" width="48" height="46" fill="#2d4159" stroke="rgba(201,151,63,.5)"/>
-          <path d="M6 30h8v-8h8v8h8v-8h8v8h8v-8h8v8h6" fill="none" stroke="rgba(201,151,63,.6)" stroke-width="3"/>
-          <rect x="24" y="52" width="12" height="24" rx="6" fill="#0e1726" stroke="rgba(201,151,63,.4)"/>
-          <path d="M30 22V8l14 5-14 5" fill="#c9973f"/>
-        </svg>
-      </div>
-      <div class="ty-banner" data-banner hidden></div>
-    </div>
+    <div class="ty-field" data-field>${CASTLE_SVG}<div class="ty-banner" data-banner hidden></div></div>
     <div class="ty-finger" data-finger>&nbsp;</div>
     <div data-kb></div>`;
 
   const kb = playEl.querySelector("[data-kb]");
   KB.render(kb);
-  playEl.querySelector("[data-quit]").onclick = home;
+  const el = (s) => playEl.querySelector(s);
+  const banner = el("[data-banner]");
 
-  game = {
-    field: playEl.querySelector("[data-field]"),
-    banner: playEl.querySelector("[data-banner]"),
-    elHp: playEl.querySelector("[data-hp]"),
-    elWave: playEl.querySelector("[data-wave]"),
-    elScore: playEl.querySelector("[data-score]"),
-    elCombo: playEl.querySelector("[data-combo]"),
-    elFinger: playEl.querySelector("[data-finger]"),
-    kb,
-    hp: MAX_HP, score: 0, streak: 0, waveNo: 0,
-    foes: [], pool: [], left: 0, spawnIn: 0, cfg: null,
-    last: 0, raf: 0, over: false, bad: false, typed: 0, missed: 0,
-  };
+  /* 적을 미리 한 마리씩 짜 둔다. 같은 i 를 여러 번 물어도 같은 답이 나와야
+     화면에서 적이 갑자기 빨라지거나 느려지지 않는다. */
+  const plan = [];
+  let waveNo = 0, leftInWave = 0, pool = [], cfgW = null;
 
-  nextWave();
-  drawHud();
-  capture(onKey);
-  game.last = performance.now();
-  game.raf = requestAnimationFrame(loop);
-}
-
-export function home() {
-  if (!homeEl) return;
-  stop();
-  playEl.hidden = true;
-  playEl.innerHTML = "";
-  homeEl.hidden = false;
-  draw();
-}
-
-export function stop() {
-  if (game) { cancelAnimationFrame(game.raf); game = null; }
-  capture(null);
-}
-
-function nextWave() {
-  const g = game;
-  g.waveNo++;
-  g.cfg = wave(g.waveNo);
-  const all = Topics.words().filter((w) => [...w].length <= g.cfg.maxLen);
-  // 짧은 낱말이 동나면 길이 제한을 푼다 — 주제를 하나만 골라도 판이 굴러가야 한다
-  g.pool = shuffle((all.length >= 6 ? all : Topics.words()).slice());
-  g.left = g.cfg.count;
-  g.spawnIn = 0.6;
-  banner(`물결 ${g.waveNo}`);
-}
-
-function banner(text) {
-  const b = game.banner;
-  b.textContent = text;
-  b.hidden = false;
-  b.classList.remove("show");
-  void b.offsetWidth;
-  b.classList.add("show");
-  setTimeout(() => { if (game && game.banner === b) b.hidden = true; }, 1200);
-}
-
-function spawn() {
-  const g = game;
-  const used = new Set(g.foes.map((f) => f.word));
-  let word = g.pool.find((w) => !used.has(w)) || g.pool[0];
-  g.pool = g.pool.filter((w) => w !== word).concat(word);   // 뒤로 돌린다
-
-  const el = document.createElement("div");
-  el.className = "ty-foe";
-  el.innerHTML = `<span class="ty-foe-mark">${Topics.markOf(word) || "👾"}</span><span class="ty-foe-word"></span>`;
-  el.style.top = (34 + Math.random() * 40) + "%";   // 성 높이 언저리로 모은다
-  g.field.appendChild(el);
-
-  g.foes.push({ word, run: createRun(word), x: 1, el, wordEl: el.querySelector(".ty-foe-word") });
-  g.left--;
-  paintFoe(g.foes[g.foes.length - 1]);
-}
-
-const target = () => (game.foes.length ? game.foes.reduce((a, b) => (b.x < a.x ? b : a)) : null);
-
-function paintFoe(f) {
-  const isTarget = f === target();
-  f.el.classList.toggle("target", isTarget);
-  f.wordEl.innerHTML = isTarget ? lineHTML(f.run, game.bad) : esc(f.word);
-}
-
-function repaintAll() {
-  game.foes.forEach(paintFoe);
-  const t = target();
-  const hint = KB.highlight(game.kb, t ? t.run.expected() : null);
-  game.elFinger.textContent = hint || " ";
-}
-
-function drawHud() {
-  const g = game;
-  g.elHp.innerHTML = `${"♥".repeat(g.hp)}<span class="gone">${"♥".repeat(MAX_HP - g.hp)}</span>`;
-  g.elWave.textContent = g.waveNo;
-  g.elScore.textContent = g.score;
-  g.elCombo.textContent = "×" + combo().toFixed(1);
-}
-
-const combo = () => Math.min(3, 1 + game.streak * 0.1);
-
-function onKey(ev) {
-  const g = game;
-  if (!g || g.over) return;
-  const t = target();
-  if (!t) return;
-
-  if (ev.back) { t.run.back(); g.bad = false; repaintAll(); return; }
-
-  const r = t.run.press(ev.stroke);
-  if (r === "bad") {
-    g.missed++;
-    g.bad = true;
-    g.streak = 0;
-    KB.flashBad(g.kb, ev.code);
-    Sfx.miss();
-    t.el.classList.remove("shake"); void t.el.offsetWidth; t.el.classList.add("shake");
-    drawHud(); repaintAll();
-    return;
-  }
-  g.bad = false;
-  g.typed++;
-  Sfx.key();
-  if (r === "done") {
-    g.score += Math.round(analyze(t.word).strokes * 10 * combo());
-    g.streak++;
-    Sfx.word();
-    kill(t, true);
-    drawHud();
-  }
-  repaintAll();
-}
-
-function kill(f, cheer) {
-  f.el.classList.add(cheer ? "pop" : "crash");
-  const el = f.el;
-  setTimeout(() => el.remove(), 260);
-  game.foes = game.foes.filter((x) => x !== f);
-}
-
-function loop(now) {
-  const g = game;
-  if (!g) return;
-  const dt = Math.min(0.05, (now - g.last) / 1000);   // 탭을 갔다 오면 크게 튄다 — 잘라 낸다
-  g.last = now;
-
-  if (g.left > 0 && g.foes.length < ALIVE_CAP) {
-    g.spawnIn -= dt;
-    if (g.spawnIn <= 0) { spawn(); g.spawnIn = g.cfg.gap; repaintAll(); }
+  function showBanner(text) {
+    banner.textContent = text;
+    banner.hidden = false;
+    banner.classList.remove("show");
+    void banner.offsetWidth;
+    banner.classList.add("show");
+    setTimeout(() => { banner.hidden = true; }, 1200);
   }
 
-  let reached = false;
-  for (const f of g.foes.slice()) {
-    f.x -= dt / g.cfg.cross;
-    f.el.style.left = (6 + f.x * 88) + "%";
-    f.el.classList.toggle("near", f.x < 0.22);
-    if (f.x <= 0) {
-      reached = true;
-      g.hp--; g.streak = 0;
-      Sfx.hurt();
-      g.field.classList.remove("hit"); void g.field.offsetWidth; g.field.classList.add("hit");
-      kill(f, false);
+  function extend() {
+    if (leftInWave === 0) {
+      waveNo++;
+      cfgW = wave(waveNo);
+      leftInWave = cfgW.count;
+      const short = Topics.words().filter((w) => [...w].length <= cfgW.maxLen);
+      // 짧은 낱말이 동나면 길이 제한을 푼다 — 주제를 하나만 골라도 판이 굴러가야 한다
+      pool = shuffle((short.length >= 6 ? short : Topics.words()).slice());
+      showBanner(`물결 ${waveNo}`);
+      el("[data-wave]").textContent = waveNo;
     }
+    const used = new Set(plan.slice(-4).map((p) => p.word));
+    const word = pool.find((w) => !used.has(w)) || pool[0];
+    pool = pool.filter((w) => w !== word).concat(word);
+    plan.push({ word, cross: cfgW.cross, gap: cfgW.gap });
+    leftInWave--;
   }
-  if (reached) { drawHud(); repaintAll(); }
+  const at = (i) => { while (plan.length <= i) extend(); return plan[i]; };
 
-  if (g.hp <= 0) { finish(); return; }
-  if (g.left === 0 && g.foes.length === 0) { nextWave(); drawHud(); }
-
-  g.raf = requestAnimationFrame(loop);
+  let score = 0;
+  const field = run(el("[data-field]"), {
+    kb,
+    total: Infinity,
+    hp: MAX_HP,
+    nextWord: (i) => at(i).word,
+    pace: (i) => at(i),
+    markOf: (w) => Topics.markOf(w),
+    onHint: (h) => { el("[data-finger]").textContent = h; },
+    onKill: ({ gained }) => { score += gained; el("[data-score]").textContent = score; },
+    onUpdate: (s) => {
+      el("[data-hp]").innerHTML = hearts(s.hp, MAX_HP);
+      el("[data-combo]").textContent = "×" + s.combo.toFixed(1);
+    },
+    onEnd: (r) => finish(r, score, waveNo),
+  });
+  game = { field };
+  el("[data-quit]").onclick = home;
 }
 
-function finish() {
-  const g = game;
-  g.over = true;
-  cancelAnimationFrame(g.raf);
-  capture(null);
-  const acc = g.typed + g.missed ? Math.round((g.typed / (g.typed + g.missed)) * 100) : 100;
-  const fresh = Progress.record("castle", { score: g.score, acc });
-  const best = Progress.get("castle").score;
+function finish(r, score, waveNo) {
   game = null;
-
+  const fresh = Progress.record("castle", { score, acc: r.acc });
+  const best = Progress.get("castle").score;
+  Sfx.hurt();
   playEl.innerHTML = `
     <div class="ty-done">
       <h2>성이 무너졌어요</h2>
       ${fresh ? `<p class="hint">새 최고 점수!</p>` : `<p class="hint">최고 점수는 ${best}점</p>`}
       <div class="stats">
-        <div class="stat">점수<b>${g.score}</b></div>
-        <div class="stat">막아 낸 물결<b>${g.waveNo - 1}</b></div>
-        <div class="stat">정확도<b>${acc}%</b></div>
+        <div class="stat">점수<b>${score}</b></div>
+        <div class="stat">막아 낸 적<b>${r.kills}</b></div>
+        <div class="stat">정확도<b>${r.acc}%</b></div>
       </div>
       <div class="card-actions">
         <button class="btn primary" data-again>다시 지키기</button>

@@ -2,10 +2,12 @@
 
 /* ── 안내 ── */
 .ty-need-kb{
-  margin-top:20px; padding:16px 18px; border-radius:10px; line-height:1.8; font-size:13.5px;
-  background:rgba(224,87,109,.1); border:1px solid rgba(224,87,109,.45); color:var(--parch);
+  margin-top:20px; padding:14px 18px; border-radius:10px; line-height:1.8; font-size:13.5px;
+  background:rgba(201,151,63,.12); border:1px solid rgba(201,151,63,.45); color:#f0e2c4;
 }
-.ty-need-kb b{color:var(--u3)}
+.ty-need-kb b{color:var(--brass)}
+.ty-need-kb p{margin:0 0 10px}
+.ty-need-kb .btn{font-size:12.5px; padding:6px 14px}
 
 /* ── 주제 고르기 ── */
 .ty-topics{display:flex; flex-wrap:wrap; gap:7px}
@@ -72,23 +74,35 @@
 .ty-finger{margin-top:16px; text-align:center; font-size:14px; color:var(--brass); letter-spacing:.06em; min-height:1.4em}
 
 /* ── 화면 자판 ── */
-.ty-kb{margin-top:10px; display:flex; flex-direction:column; gap:6px; align-items:center; user-select:none}
-.ty-kb-row{display:flex; gap:6px}
+/* 키 너비는 --w 배수로 온다(실제 자판 비율). --u 한 칸에 사이 간격을 더해 계산하면
+   여러 칸짜리 키가 아래 줄 경계와 정확히 맞아떨어진다. */
+.ty-kb{--u:clamp(28px,3.4vw,42px); --kgap:5px;
+  margin-top:10px; display:flex; flex-direction:column; gap:var(--kgap); align-items:center; user-select:none;
+  /* 손가락으로 누르는 자판이기도 하다. 누를 때 화면이 확대되거나 파랗게 번지면 안 된다. */
+  touch-action:manipulation; -webkit-tap-highlight-color:transparent}
+/* 좁은 화면용 10칸 배열 — 폰 너비에 딱 맞춰 키를 최대한 키운다 */
+.ty-kb-compact{--kgap:6px; --u:min(46px, (100vw - 26px - 9 * var(--kgap)) / 10)}
+.ty-kb-compact .ty-k{height:calc(var(--u) * 1.34)}
+.ty-kb-compact .ty-k-main{font-size:calc(var(--u) * .46)}
+/* 손가락으로 칠 때 손가락 색은 뜻이 없다 — 조용히 낮춘다 */
+.ty-kb-compact .ty-k{border-bottom-color:rgba(147,167,192,.3)}
+.ty-kb-row{display:flex; gap:var(--kgap)}
 .ty-k{
-  --fg:var(--mist);
-  position:relative; width:clamp(34px,4.6vw,46px); height:clamp(38px,5vw,50px);
+  --fg:var(--mist); --w:1;
+  position:relative; width:calc(var(--u) * var(--w) + (var(--w) - 1) * var(--kgap));
+  height:calc(var(--u) * 1.08);
   display:flex; flex-direction:column; align-items:center; justify-content:center;
-  border-radius:7px; background:linear-gradient(#20304a,#16212f);
+  border-radius:6px; background:linear-gradient(#20304a,#16212f);
   border:1px solid rgba(201,151,63,.2); border-bottom:3px solid color-mix(in srgb, var(--fg) 55%, #0a1220);
   transition:background .1s, box-shadow .1s, transform .1s;
 }
-.ty-k-main{font-family:var(--display); font-size:16px; color:var(--parch)}
-.ty-k-up{position:absolute; top:2px; right:4px; font-size:10px; color:var(--mist)}
-.ty-k-shift{width:clamp(42px,5.6vw,60px)}
-.ty-k-shift .ty-k-main,.ty-k-space .ty-k-main{font-family:var(--body); font-size:11px; color:var(--mist)}
-.ty-k-space{width:clamp(160px,26vw,260px)}
+.ty-k-main{font-family:var(--display); font-size:calc(var(--u) * .38); color:var(--parch); line-height:1}
+.ty-k-up{position:absolute; top:2px; right:4px; font-size:calc(var(--u) * .24); color:var(--mist); line-height:1}
+.ty-k-word{font-family:var(--body); font-size:calc(var(--u) * .25); color:var(--mist)}
+/* 눌러도 아무 일이 없는 자리는 있는 듯 없는 듯 */
+.ty-k-dead{opacity:.4; border-bottom-color:rgba(147,167,192,.25)}
 /* 홈 위치 돌기 — 검지가 어디에 놓이는지 */
-.ty-k-home::after{content:""; position:absolute; bottom:6px; width:14px; height:2px; border-radius:2px; background:rgba(255,231,178,.5)}
+.ty-k-home::after{content:""; position:absolute; bottom:5px; width:13px; height:2px; border-radius:2px; background:rgba(255,231,178,.5)}
 .ty-k.on{
   background:linear-gradient(color-mix(in srgb, var(--fg) 62%, #16212f), color-mix(in srgb, var(--fg) 34%, #0e1726));
   border-color:var(--fg); transform:translateY(1px);
@@ -98,6 +112,13 @@
 .ty-k.on-shift{border-color:var(--fg); box-shadow:0 0 0 2px color-mix(in srgb, var(--fg) 35%, transparent)}
 .ty-k.on-shift .ty-k-main{color:var(--parch)}
 .ty-k.bad{background:linear-gradient(#4a1c26,#2a1017); border-color:var(--u3); animation:tyShake .22s}
+/* 손가락이 닿은 순간 — 눌린 것이 보여야 아이가 두 번 누르지 않는다 */
+.ty-k.tap{background:linear-gradient(#3a5075,#243450); transform:translateY(2px)}
+/* shift 를 눌러 둔 상태. 한 글자만 걸린다는 것을 색으로 알린다 */
+.ty-k.sticky{background:linear-gradient(#6b4d18,#3a2a0c); border-color:var(--brass)}
+.ty-k.sticky .ty-k-main{color:#ffe6ae}
+.ty-k-cmd .ty-k-main{font-family:var(--body); font-size:calc(var(--u) * .3); color:var(--mist)}
+.ty-k-layer .ty-k-main{font-family:var(--mono); font-size:calc(var(--u) * .3); color:var(--brass)}
 
 .ty-legend{display:flex; flex-wrap:wrap; gap:6px 14px; justify-content:center; margin-top:14px; font-size:10.5px; color:var(--mist)}
 .ty-legend span{display:inline-flex; align-items:center; gap:5px}
@@ -168,8 +189,135 @@
 .ty-banner.show{animation:tyBanner 1.2s ease-out}
 @keyframes tyBanner{0%{opacity:0; transform:scale(.7)}25%{opacity:1; transform:scale(1)}75%{opacity:1}100%{opacity:0}}
 
-@media (max-width:640px){
-  .ty-k{width:8.4vw; height:9vw}
-  .ty-k-main{font-size:13px}
-  .ty-legend{display:none}
+
+/* ── 목록 (지문 · 글감 · 내 글 · 방) ── */
+.ty-h3{font-family:var(--display); font-size:14.5px; color:var(--brass); margin:0 0 10px; letter-spacing:.04em}
+.ty-list{display:grid; gap:8px; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr))}
+.ty-item{
+  display:flex; flex-direction:column; gap:4px; text-align:left; color:inherit; font:inherit;
+  padding:12px 14px; border-radius:10px; cursor:pointer;
+  background:linear-gradient(150deg, rgba(29,44,67,.85), rgba(15,23,36,.85));
+  border:1px solid rgba(201,151,63,.24); transition:.15s;
+}
+button.ty-item:hover, .ty-item-open:hover{border-color:var(--brass); transform:translateY(-2px)}
+.ty-item:focus-visible, .ty-item-open:focus-visible{outline:2px solid var(--brass); outline-offset:2px}
+.ty-item[disabled], .ty-item-open[disabled]{opacity:.4; pointer-events:none}
+.ty-item-name{font-size:14px; color:var(--parch)}
+.ty-item-sub{font-size:11.5px; color:var(--mist); line-height:1.6}
+/* 목록 한 줄에 단추가 하나 더 붙는 꼴 (내 글 · 방) */
+.ty-item-row{flex-direction:row; align-items:center; gap:10px; cursor:default; padding:0}
+.ty-item-row:hover{transform:none}
+.ty-item-open{flex:1; min-width:0; display:flex; flex-direction:column; gap:4px; text-align:left;
+  background:none; border:0; color:inherit; font:inherit; cursor:pointer; padding:12px 14px; border-radius:10px}
+.ty-item-open .ty-item-sub{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.ty-item-del{font-size:11.5px; padding:6px 10px; margin-right:12px; flex:none}
+.ty-item-code{font-family:var(--mono); font-size:12.5px; color:var(--brass); padding-right:14px; letter-spacing:.1em}
+
+/* ── 자유 작문 책상 ── */
+.ty-hintline{margin-top:12px; padding:9px 13px; border-radius:8px; font-size:13px;
+  background:rgba(201,151,63,.12); border:1px solid rgba(201,151,63,.45); color:#f0e2c4}
+.ty-desk{
+  min-height:190px; max-height:42vh; overflow-y:auto; cursor:text;
+  font-family:var(--display); font-size:clamp(17px,2.2vw,21px); line-height:2;
+  white-space:pre-wrap; word-break:break-word; text-align:left;
+}
+.ty-desk .ty-w-text{color:var(--parch)}
+.ty-caret{display:inline-block; width:2px; height:1.1em; vertical-align:-.16em;
+  background:var(--brass); margin-left:1px; animation:tyBlink 1s step-end infinite}
+@keyframes tyBlink{50%{opacity:0}}
+
+/* ── 대결 진행 막대 ── */
+.ty-score{display:flex; flex-direction:column; gap:9px; margin-top:14px}
+.ty-race-head{display:flex; justify-content:space-between; gap:10px; font-size:12.5px; color:var(--mist)}
+.ty-race-head .num{font-family:var(--mono); font-variant-numeric:tabular-nums}
+.ty-race.me .ty-race-head{color:var(--parch)}
+.ty-race-bar{height:9px; margin-top:4px; border-radius:99px; overflow:hidden;
+  background:rgba(255,255,255,.07); border:1px solid rgba(201,151,63,.18)}
+.ty-race-bar>div{height:100%; width:0; background:#6fe3b0; transition:width .25s}
+.ty-race.me .ty-race-bar>div{background:var(--brass)}
+.ty-code{font-family:var(--mono); letter-spacing:.14em; color:var(--brass)}
+
+/* 탭이 다섯 개가 되면 좁은 화면에서 넘친다 — 넘치면 줄을 바꾼다 */
+.tabs{flex-wrap:wrap}
+
+
+/* ── 한글·영문 고르기 ── */
+.ty-lang{display:inline-flex; gap:0; border-radius:99px; padding:3px;
+  background:rgba(9,15,25,.6); border:1px solid rgba(201,151,63,.3)}
+.ty-lang-b{
+  font-family:var(--body); font-size:13px; color:var(--mist);
+  background:none; border:0; border-radius:99px; padding:8px 18px; min-height:38px;
+  cursor:pointer; transition:.15s;
+}
+.ty-lang-b:hover{color:var(--parch)}
+.ty-lang-b.on{background:linear-gradient(#c9973f,#9c7024); color:#1a1206; font-weight:700}
+.ty-lang-b:focus-visible{outline:2px solid var(--brass); outline-offset:2px}
+/* 영문 자판은 글자가 하나씩이라 조금 크게 보여도 된다 */
+.ty-kb[data-layout="en"] .ty-k-main{text-transform:lowercase}
+
+/* ══════════════ 좁은 화면·낮은 화면 ══════════════
+   이 블록은 파일 맨 끝에 있어야 한다. 가운데에 두면 뒤에 오는 기본 규칙이
+   같은 선택자를 다시 선언하며 덮어써, 폰에서만 조용히 무시된다. */
+@media (max-width:780px){
+  .ty-legend{display:none}          /* 손가락으로 치는 배열에서는 운지 범례가 뜻이 없다 */
+  /* 좁은 화면에서는 한 줄이 곧 자판 한 줄이다 — 안내 상자가 자판을 밀어내지 않게
+     한 줄짜리 띠로 눕힌다. 상자가 127px 을 먹으면 정작 안내하려던 그 자판이
+     화면 밖으로 밀려나, 아이는 눌러 볼 수조차 없다. */
+  .ty-need-kb{margin-top:10px; padding:8px 12px; font-size:12px; line-height:1.55;
+    display:flex; align-items:center; gap:10px}
+  /* display 를 주면 hidden 속성이 덮인다 — 닫아도 상자가 74px 을 그대로 차지했다 */
+  .ty-need-kb[hidden]{display:none}
+  .ty-need-kb p{margin:0; flex:1}
+  .ty-need-kb .btn{flex:none; padding:7px 12px; font-size:12px}
+  .ty-finger{margin-top:10px; font-size:12.5px}
+  .ty-bar{padding-top:10px}
+  .ty-head{padding-top:8px}
+  .ty-list{grid-template-columns:1fr}
+  .ty-lang{width:100%}
+  .ty-lang-b{flex:1; min-height:44px}
+  .ty-field{height:min(32vh,240px)}
+  .ty-desk{min-height:34vh; font-size:18px; line-height:1.9}
+  .ty-paper{padding:20px 14px 16px}
+  .ty-ch b{font-size:clamp(22px,6.4vw,30px)}
+
+  /* 대결은 진행 막대가 한 덩이 더 붙어서, 그대로 두면 자판이 화면 아래로 밀려난다.
+     재 보면 48px 이 모자랐다. 자판이 안 보이면 손가락으로는 아예 칠 수 없으므로,
+     대결에서는 덜 중요한 것부터 접는다.
+       · 정확도·분당 타수 — 대결에서는 막대가 그 자리를 대신한다
+       · 다음 줄 미리보기 — 지금 줄만 보면 된다
+       · 손가락 이름 — 자판이 그 자리를 직접 짚어 준다 */
+  .ty-score{gap:6px; margin-top:10px}
+  .ty-race-bar{height:7px; margin-top:3px}
+  .ty-duel-play .ty-next{display:none}
+  .ty-duel-play .ty-finger{display:none}
+  .ty-duel-play .ty-head{display:none}
+  .ty-duel-play .ty-paper{padding:14px 14px 12px; margin-top:10px}
+  .ty-duel-play .ty-bar{padding-top:8px; padding-bottom:0}
+  /* 성 지키기 대결은 성터까지 얹히므로 성터를 한 뼘 줄인다 */
+  .ty-duel-play .ty-field{height:min(24vh,185px)}
+}
+
+/* 낮은 화면(작은 폰·가로 눕힘)에서는 자판이 먼저다. 글자와 여백을 더 줄인다. */
+@media (max-width:780px) and (max-height:700px){
+  .ty-bar{padding-top:6px; padding-bottom:0}
+  .ty-step{display:none}
+  .ty-title{font-size:13px}
+  .ty-paper{padding:12px 12px 10px; margin-top:8px; min-height:96px}
+  .ty-line{min-height:40px}
+  .ty-ch b{font-size:clamp(19px,5.4vw,26px)}
+  .ty-next{display:none}
+  .ty-score{margin-top:8px; gap:5px}
+  .ty-duel-play .ty-field{height:min(21vh,150px)}
+}
+
+/* 아주 낮은 화면(320×568 같은 작은 폰)에서 성 지키기 대결은 성터를 한 번 더 줄인다.
+   적이 다가오는 것만 보이면 되고, 자판이 잘리는 것이 훨씬 나쁘다. */
+@media (max-width:780px) and (max-height:600px){
+  .ty-duel-play .ty-field{height:min(17vh,120px)}
+  .ty-score{margin-top:6px}
+  /* 긴 문장은 두 줄로 접히면서 종이가 그만큼 높아진다. 글자를 한 뼘 줄이면
+     대부분의 문장이 한 줄에 들어가 높이가 들쭉날쭉하지 않는다. */
+  .ty-ch b{font-size:clamp(16px,4.4vw,21px)}
+  .ty-paper{min-height:84px}
+  .ty-duel-play .ty-paper{padding:10px 10px 8px}
 }

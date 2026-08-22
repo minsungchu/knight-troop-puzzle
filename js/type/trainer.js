@@ -14,7 +14,11 @@ let live = null;
 
 /**
  * @param {HTMLElement} el   그릴 자리
- * @param {object} opt {title, lines, backLabel, onDone(stats), onQuit()}
+ * @param {object} opt
+ *   {title, lines, backLabel, onDone(stats), onQuit()}
+ *   scoreSlot  대결에서 두 사람의 진행 막대를 얹을 자리를 비워 둔다
+ *   onProgress(hits) 제대로 친 타수가 늘 때마다. 대결에서 상대에게 알리는 데 쓴다
+ * @returns {{setScore(html:string):void, stop():void}}
  */
 export function start(el, opt) {
   stop();
@@ -33,6 +37,7 @@ export function start(el, opt) {
       <span>정확도<b data-acc>100%</b></span>
       <span>분당 타수<b data-cpm>0</b></span>
     </div>
+    ${opt.scoreSlot ? `<div class="ty-score" data-score></div>` : ""}
     <div class="ty-paper">
       <div class="ty-line" data-cur></div>
       <div class="ty-next" data-next></div>
@@ -83,6 +88,7 @@ export function start(el, opt) {
     }
     state.bad = false;
     Sfx.key();
+    if (opt.onProgress) opt.onProgress(series.stats().hits);
     if (r === "done") {
       if (!series.next()) {
         clearInterval(tick);
@@ -97,6 +103,12 @@ export function start(el, opt) {
   });
 
   live = { tick };
+
+  const scoreEl = el.querySelector("[data-score]");
+  return {
+    setScore(html) { if (scoreEl) scoreEl.innerHTML = html; },
+    stop,
+  };
 }
 
 export function stop() {

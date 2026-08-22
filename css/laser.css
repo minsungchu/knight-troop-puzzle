@@ -1,9 +1,16 @@
 /* 레이저 미로 — 판과 등반 지도 */
 
 .lz-stage{display:flex; justify-content:center; padding:22px 0 8px; perspective:1400px}
-.lz-board{position:relative; transform:rotateX(14deg); transform-style:preserve-3d;
+
+/* 기울기는 두되 3차원으로 세우지는 않는다(transform-style 을 preserve-3d 로 두지 않는다).
+   기울어진 판을 3차원으로 세우면 브라우저가 아래쪽 절반의 칸을 눌러도 잡아내지 못한다.
+   재 보면 6×6 판의 36칸 중 18칸 — 정확히 회전축 아래쪽 전부 — 이 화면 어디를 눌러도
+   반응하지 않았다. 판의 절반을 못 쓰면 대부분의 문제는 아예 풀 수 없다.
+   평평하게 두면 보이는 기울기는 그대로이면서 36칸이 모두 살아난다.
+   받침대의 깊이(translateZ)도 그래서 뺐다 — 테두리와 그림자만으로 충분히 받침대로 보인다. */
+.lz-board{position:relative; transform:rotateX(14deg);
   --cell:56px; --gap:4px; --plinth:18px}
-.lz-plinth{position:absolute; inset:calc(var(--plinth) * -1); border-radius:12px; transform:translateZ(-14px);
+.lz-plinth{position:absolute; inset:calc(var(--plinth) * -1); border-radius:12px;
   background:linear-gradient(160deg,#1b2b42,#0d1626 60%); border:1px solid rgba(201,151,63,.3);
   box-shadow:0 36px 64px rgba(0,0,0,.62), inset 0 0 60px rgba(0,0,0,.5)}
 
@@ -95,3 +102,248 @@
 .lz-progress{display:flex; flex-wrap:wrap; gap:8px 18px; align-items:center; margin-top:12px;
   font-size:13px; color:var(--mist)}
 .lz-progress b{color:var(--parch); font-family:var(--mono,ui-monospace,Menlo,monospace)}
+
+/* ══════════════ 단추 ══════════════
+   여기 단추들은 브라우저 기본 모양 그대로였다 — 어두운 판 위에 흰 상자가 떠 있었고,
+   높이가 24px 이라 폰에서 손가락으로 누르기 어려웠다. 판과 같은 결로 맞춘다. */
+.view[data-view="versus"] button:not(.tab),
+#lzPlay button:not(.tab),
+#lzMap button:not(.tab){
+  font-family:var(--body); font-size:13.5px; color:var(--parch);
+  background:linear-gradient(#1d2c43,#15202f);
+  border:1px solid rgba(201,151,63,.34); border-radius:7px;
+  padding:9px 14px; min-height:40px; cursor:pointer; transition:.16s;
+  -webkit-tap-highlight-color:transparent;
+}
+.view[data-view="versus"] button:not(.tab):hover,
+#lzPlay button:not(.tab):hover,
+#lzMap button:not(.tab):hover{
+  border-color:var(--brass); background:linear-gradient(#26374f,#182437);
+}
+.view[data-view="versus"] button.on,
+#lzPlay button.on{
+  background:linear-gradient(#c9973f,#9c7024); color:#1a1206;
+  border-color:#e0b45c; font-weight:700;
+}
+.view[data-view="versus"] button.on:hover{background:linear-gradient(#dda94f,#a87b28)}
+.view[data-view="versus"] button.big{font-size:15px; padding:13px 24px; min-height:48px}
+.view[data-view="versus"] button[disabled],
+#lzPlay button[disabled]{opacity:.4; pointer-events:none}
+.view[data-view="versus"] button:focus-visible,
+#lzPlay button:focus-visible{outline:2px solid var(--brass); outline-offset:2px}
+
+.lz-title{font-family:var(--display); font-size:17px; color:var(--parch)}
+.lz-top{margin-top:12px}
+.lz-clock{font-size:12.5px; color:var(--mist)}
+.lz-clock b{font-family:var(--mono,ui-monospace,Menlo,monospace); color:var(--parch);
+  margin-left:6px; font-variant-numeric:tabular-nums}
+.lz-pan{padding:16px 18px 18px}
+.lz-pan h2{font-family:var(--display); color:var(--parch); font-size:16px; margin:0 0 10px}
+.lz-count{font-family:var(--mono,ui-monospace,Menlo,monospace); font-size:13px; color:var(--mist); margin-left:6px}
+.lz-empty{padding:26px 10px; text-align:center; color:var(--mist); font-size:13.5px; line-height:1.9}
+.lz-wait{font-size:13px; color:var(--mist); padding:10px 2px}
+.lz-go{justify-content:center; margin-top:18px}
+
+/* ── 막힌 이유 ── */
+.lz-blocked{padding:22px 20px}
+.lz-blocked h2{font-family:var(--display); color:var(--brass); font-size:18px; margin:0 0 10px}
+.lz-blocked code{font-family:var(--mono,ui-monospace,Menlo,monospace); font-size:12.5px;
+  background:rgba(201,151,63,.12); border:1px solid rgba(201,151,63,.3);
+  border-radius:5px; padding:2px 6px; color:#f0e2c4; word-break:break-all}
+
+/* ── 로비 ── */
+.lz-hero{display:flex; flex-wrap:wrap; gap:16px; align-items:flex-start; margin-top:16px;
+  padding:20px 22px; border-radius:12px;
+  background:linear-gradient(150deg, rgba(27,43,66,.9), rgba(13,22,36,.75));
+  border:1px solid rgba(201,151,63,.28)}
+.lz-hero-say{flex:1 1 260px}
+.lz-hero-say h2{font-family:var(--display); color:var(--brass); font-size:20px; margin:0 0 6px}
+.lz-hero-say p{color:var(--mist); font-size:13px; margin:0 0 10px; line-height:1.8}
+.lz-rules{margin:0; padding-left:18px; color:var(--mist); font-size:12.5px; line-height:2}
+.lz-rules b{color:var(--parch)}
+.lz-hero-act{justify-content:flex-start; margin-top:14px}
+
+.lz-grade{display:flex; flex-direction:column; gap:2px; align-items:flex-end;
+  min-width:120px; padding:12px 16px; border-radius:10px;
+  background:rgba(201,151,63,.1); border:1px solid rgba(201,151,63,.35)}
+.lz-grade-name{font-family:var(--display); font-size:19px; color:var(--brass)}
+.lz-grade-pt{font-family:var(--mono,ui-monospace,Menlo,monospace); font-size:13px; color:var(--parch)}
+.lz-grade-rec{font-size:11.5px; color:var(--mist)}
+
+.lz-rooms{display:flex; flex-direction:column; gap:8px}
+.lz-room{display:flex; flex-wrap:wrap; gap:10px 14px; align-items:center; justify-content:space-between;
+  padding:12px 14px; border-radius:9px;
+  background:rgba(23,38,58,.6); border:1px solid rgba(201,151,63,.2)}
+.lz-room.full{opacity:.55}
+.lz-room-a{display:flex; flex-direction:column; gap:6px; min-width:0}
+.lz-room-b{display:flex; gap:12px; align-items:center}
+.lz-room-name{font-size:14px; color:var(--parch); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.lz-room-n{font-family:var(--mono,ui-monospace,Menlo,monospace); font-size:13px; color:var(--mist)}
+
+.lz-mix{display:flex; flex-wrap:wrap; gap:6px; font-size:11.5px}
+.lz-mix span{border-radius:99px; padding:2px 9px; border:1px solid transparent}
+.lz-mix.big{gap:8px; font-size:13px; margin-bottom:8px}
+.lz-mix.big span{padding:5px 13px}
+.lz-t-low{color:#6fe3b0; background:rgba(111,227,176,.12); border-color:rgba(111,227,176,.4) !important}
+.lz-t-mid{color:#ffd98a; background:rgba(255,217,138,.12); border-color:rgba(255,217,138,.4) !important}
+.lz-t-high{color:#e0576d; background:rgba(224,87,109,.13); border-color:rgba(224,87,109,.45) !important}
+.lz-mix-all{color:var(--mist); border-color:rgba(201,151,63,.3) !important}
+
+/* ── 방 ── */
+.lz-code-card{margin-top:14px; padding:18px; border-radius:12px; text-align:center;
+  background:linear-gradient(150deg, rgba(107,77,24,.35), rgba(13,22,36,.7));
+  border:1px solid rgba(224,180,92,.5)}
+.lz-code-say{font-size:12.5px; color:var(--mist)}
+.lz-code{font-family:var(--mono,ui-monospace,Menlo,monospace); font-size:clamp(30px,9vw,44px);
+  letter-spacing:.22em; color:#ffe6ae; margin:8px 0 12px; user-select:all;
+  text-shadow:0 0 22px rgba(224,180,92,.55)}
+.lz-copy{margin:0 auto}
+
+.lz-seats{display:flex; flex-direction:column; gap:8px}
+.lz-seat{display:flex; flex-wrap:wrap; gap:6px 12px; align-items:center; justify-content:space-between;
+  padding:12px 14px; border-radius:9px;
+  background:rgba(23,38,58,.6); border:1px solid rgba(201,151,63,.2)}
+.lz-seat.me{border-color:rgba(224,180,92,.6); background:rgba(107,77,24,.22)}
+.lz-seat.waiting{border-style:dashed; opacity:.7}
+.lz-seat-name{font-size:14px; color:var(--parch); display:flex; align-items:center; gap:8px}
+.lz-seat-grade{font-size:12.5px; color:var(--mist); font-family:var(--mono,ui-monospace,Menlo,monospace)}
+.lz-host{font-size:10.5px; letter-spacing:.1em; color:var(--brass);
+  border:1px solid rgba(201,151,63,.45); border-radius:99px; padding:2px 8px}
+.lz-me{font-size:10.5px; letter-spacing:.1em; color:#1a1206; background:var(--brass);
+  border-radius:99px; padding:2px 8px}
+
+/* ── 전황판 ── */
+.lz-score{margin-top:14px; padding:12px 16px; border-radius:10px;
+  background:rgba(13,22,36,.6); border:1px solid rgba(201,151,63,.24)}
+.lz-race + .lz-race{margin-top:10px}
+.lz-race-head{display:flex; justify-content:space-between; align-items:baseline; font-size:12.5px}
+.lz-race-name{color:var(--mist); display:flex; align-items:center; gap:7px}
+.lz-race.me .lz-race-name{color:var(--parch)}
+.lz-race-num{font-family:var(--mono,ui-monospace,Menlo,monospace); color:var(--parch);
+  font-variant-numeric:tabular-nums}
+.lz-race-num i{color:var(--mist); font-style:normal}
+.lz-race-num b{color:#6fe3b0; margin-left:4px}
+.lz-race-track{height:9px; border-radius:99px; margin-top:5px; overflow:hidden;
+  background:rgba(255,255,255,.07)}
+.lz-race-fill{height:100%; border-radius:99px; background:#4a6b8a; transition:width .35s ease}
+.lz-race.me .lz-race-fill{background:linear-gradient(90deg,#c9973f,#ffd98a)}
+.lz-race.lead:not(.me) .lz-race-fill{background:linear-gradient(90deg,#3f7f66,#6fe3b0)}
+.lz-tools{justify-content:center}
+
+/* ── 결과 ── */
+.lz-verdict{margin-top:16px; padding:24px 20px; border-radius:12px; text-align:center;
+  border:1px solid rgba(201,151,63,.3); background:rgba(13,22,36,.7)}
+.lz-verdict.win{border-color:rgba(224,180,92,.65);
+  background:linear-gradient(160deg, rgba(107,77,24,.4), rgba(13,22,36,.8))}
+.lz-verdict.lose{border-color:rgba(79,99,124,.6)}
+.lz-verdict-mark{font-size:30px; line-height:1; color:var(--brass)}
+.lz-verdict.lose .lz-verdict-mark{color:#7f92ab}
+.lz-verdict h2{font-family:var(--display); font-size:24px; margin:10px 0 6px; color:var(--parch)}
+.lz-verdict.win h2{color:#ffe6ae}
+.lz-verdict p{color:var(--mist); font-size:13px; margin:0}
+.lz-delta{display:inline-flex; flex-wrap:wrap; gap:10px; align-items:baseline; justify-content:center;
+  margin-top:14px; padding:10px 16px; border-radius:99px; font-size:13.5px;
+  background:rgba(255,255,255,.05); border:1px solid rgba(201,151,63,.3);
+  font-family:var(--mono,ui-monospace,Menlo,monospace)}
+.lz-delta b{color:var(--parch)}
+.lz-arrow-to{color:var(--mist)}
+.lz-delta-n{font-weight:700}
+.lz-delta.up .lz-delta-n{color:#6fe3b0}
+.lz-delta.down .lz-delta-n{color:#e0576d}
+.lz-verdict .lz-grade{display:inline-flex; align-items:center; margin-top:14px}
+
+.lz-ranks{display:flex; flex-direction:column; gap:8px}
+.lz-rank{display:grid; grid-template-columns:34px 1fr auto auto; gap:12px; align-items:center;
+  padding:11px 14px; border-radius:9px;
+  background:rgba(23,38,58,.6); border:1px solid rgba(201,151,63,.2)}
+.lz-rank.me{border-color:rgba(224,180,92,.6); background:rgba(107,77,24,.22)}
+.lz-rank-pos{font-family:var(--display); font-size:19px; color:var(--mist); text-align:center}
+.lz-rank.first .lz-rank-pos{color:var(--brass)}
+.lz-rank-name{font-size:14px; color:var(--parch); display:flex; align-items:center; gap:8px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.lz-rank-solved,.lz-rank-ms{font-family:var(--mono,ui-monospace,Menlo,monospace);
+  font-size:12.5px; color:var(--mist); font-variant-numeric:tabular-nums}
+
+/* ── 대화상자 (방 만들기 · 들어가기) ──
+   여기 입력칸들은 스타일이 하나도 없어 브라우저 기본으로 나왔다. 어두운 판 위에
+   흰 상자가 뜨고, 가운데 정렬 때문에 이름표와 칸이 한 줄에 뒤엉켰다. */
+#card:has(.lz-form){text-align:left; padding:26px 24px; width:min(440px,92vw)}
+#card:has(.lz-form) h2{text-align:center; margin-bottom:18px}
+.lz-form{display:flex; flex-direction:column; gap:16px}
+.lz-fld{display:flex; flex-direction:column; gap:7px}
+.lz-fld[hidden]{display:none}   /* flex 가 hidden 을 덮어써 비밀방 암호칸이 늘 보였다 */
+.lz-fld-name{font-size:11px; letter-spacing:.14em; color:var(--mist)}
+.lz-fld-name i{font-style:normal; color:#5f7189; letter-spacing:.06em}
+.lz-form input[type="text"], .lz-form input:not([type]){width:100%}
+.lz-form input:not([type="checkbox"]){
+  font-family:var(--body); font-size:15px; color:var(--parch);
+  background:rgba(9,15,25,.75); border:1px solid rgba(201,151,63,.34);
+  border-radius:8px; padding:12px 13px; min-height:48px; width:100%;
+}
+.lz-form input:not([type="checkbox"]):focus{outline:none; border-color:var(--brass)}
+.lz-code-in{font-family:var(--mono,ui-monospace,Menlo,monospace); font-size:22px !important;
+  letter-spacing:.28em; text-align:center; text-transform:uppercase}
+.lz-note{font-size:11.5px; color:var(--mist); line-height:1.7}
+.lz-check{flex-direction:row; align-items:center; gap:10px; font-size:14px; color:var(--parch)}
+.lz-check input{width:22px; height:22px; accent-color:#c9973f}
+
+.lz-choice{display:flex; gap:8px}
+.lz-choice button{flex:1}
+.lz-choice button.on{background:linear-gradient(#c9973f,#9c7024) !important; color:#1a1206 !important;
+  border-color:#e0b45c !important; font-weight:700}
+
+.lz-steps{display:flex; flex-direction:column; gap:8px}
+.lz-step{display:flex; align-items:center; gap:10px}
+.lz-step-name{border-radius:99px; padding:4px 12px; font-size:13px; border:1px solid transparent; min-width:44px; text-align:center}
+.lz-step-btn{width:48px; min-width:48px; font-size:19px !important; line-height:1; padding:0 !important}
+.lz-step-n{flex:1; text-align:center; font-family:var(--mono,ui-monospace,Menlo,monospace);
+  font-size:19px; color:var(--parch); font-variant-numeric:tabular-nums}
+.lz-sum{font-size:12.5px; color:var(--mist); margin-top:2px}
+.lz-sum b{color:var(--brass)}
+.lz-sum .bad{color:#e0576d}
+.lz-form-act{display:flex; gap:10px; margin-top:20px}
+.lz-form-act button{flex:1}
+#card .lz-form-act button{
+  font-family:var(--body); font-size:15px; color:var(--parch);
+  background:linear-gradient(#1d2c43,#15202f); border:1px solid rgba(201,151,63,.34);
+  border-radius:8px; padding:13px 18px; min-height:50px; cursor:pointer; transition:.16s;
+}
+#card .lz-form-act button.on{background:linear-gradient(#c9973f,#9c7024); color:#1a1206;
+  border-color:#e0b45c; font-weight:700}
+#card .lz-form-act button[disabled]{opacity:.4; pointer-events:none}
+#card .lz-step-btn{
+  font-family:var(--body); color:var(--parch);
+  background:linear-gradient(#1d2c43,#15202f); border:1px solid rgba(201,151,63,.34);
+  border-radius:8px; min-height:48px; cursor:pointer;
+}
+#card .lz-step-btn[disabled]{opacity:.3; pointer-events:none}
+#card .lz-choice button{
+  font-family:var(--body); font-size:14px; color:var(--parch);
+  background:linear-gradient(#1d2c43,#15202f); border:1px solid rgba(201,151,63,.34);
+  border-radius:8px; padding:11px 10px; min-height:46px; cursor:pointer;
+}
+
+/* ══════════════ 좁은 화면 ══════════════ */
+@media (max-width:620px){
+  .view[data-view="versus"] button:not(.tab),
+  #lzPlay button:not(.tab){min-height:46px; font-size:14px; padding:11px 16px}
+  .view[data-view="versus"] button.big{width:100%; min-height:52px}
+  .lz-hero{padding:16px 16px; gap:12px}
+  .lz-grade{align-items:flex-start; width:100%; min-width:0}
+  .lz-hero-act{flex-direction:column; align-items:stretch}
+  .lz-hero-act button{width:100%}
+  .lz-room{flex-direction:column; align-items:stretch}
+  .lz-room-b{justify-content:space-between}
+  .lz-room-b button{flex:1; margin-left:12px}
+  .lz-pan{padding:14px 14px 16px}
+  .lz-rank{grid-template-columns:28px 1fr auto; gap:8px}
+  .lz-rank-ms{grid-column:3; text-align:right}
+  .lz-rank-solved{grid-column:2; grid-row:2; font-size:11.5px}
+  .lz-stage{padding:14px 0 6px}
+  .lz-tools button{flex:1}
+  .lz-goal{font-size:12.5px; line-height:1.7}
+  .lz-verdict{padding:20px 14px}
+  .lz-verdict h2{font-size:21px}
+  #card:has(.lz-form){padding:22px 18px; width:94vw; max-width:94vw}
+  .lz-form-act{flex-direction:column-reverse}
+}
