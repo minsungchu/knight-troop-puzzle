@@ -32,7 +32,18 @@ create policy type_progress_read on public.type_progress
 
 -- insert / update / delete 정책 없음 → 쓰기는 아래 함수로만
 
+/* ── 만들기 전에 지운다 ──
+   create or replace 는 돌려주는 값의 모양이 달라지면 실패한다("cannot change return
+   type of existing function"). 그러면 SQL Editor 는 거기서 멈추고, 서버에는 예전 함수가
+   그대로 남는다. 실제로 그렇게 됐다 — 첫 배포판의 laser_room_create 는
+   returns table (id uuid, code text) 였고, 그 id 라는 이름이 profiles.id 와 부딪쳐
+   "column reference id is ambiguous" 로 죽었다. 고친 판을 올리려 해도 반환형이 달라
+   갈아 끼울 수 없었으니, 고치는 패치를 아무리 실행해도 서버는 계속 옛것을 썼다.
+
+   먼저 지우고 새로 만들면 그 벽이 없다. 권한은 파일 끝에서 다시 준다. */
+
 /* 내 진행 전부 */
+drop function if exists public.type_progress_get();
 create or replace function public.type_progress_get()
 returns table (item text, stars smallint, best_cpm int, best_acc smallint, best_score int)
 language sql stable security definer set search_path = '' as $$
@@ -45,6 +56,7 @@ $$;
 /* 한 항목의 기록을 남긴다.
    항상 '더 나은 쪽'만 남는다 — 같은 단계를 대충 다시 쳤다고 별이 깎이면 안 된다.
    기기를 옮겨 다녀도 합쳐지는 것은 이 규칙 하나 덕이다. */
+drop function if exists public.type_progress_set(text, int, int, int, int);
 create or replace function public.type_progress_set(
   p_item text, p_stars int, p_cpm int, p_acc int, p_score int)
 returns void

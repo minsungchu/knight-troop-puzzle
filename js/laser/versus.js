@@ -44,10 +44,22 @@ const isMissing = (e) => {
   return /PGRST202|Could not find the function|does not exist|schema cache/i.test(m);
 };
 
+/* 우리가 만든 규칙에 걸린 것인가.
+   이 함수들이 사람을 막을 때 하는 말은 전부 한국어다("로그인이 필요합니다" 같은).
+   그러니 한국어가 없는 오류는 규칙이 아니라 서버 쪽이 고장 났다는 뜻이다 — 낡은 함수가
+   남아 있거나, 열 이름이 부딪치거나. 이 구분이 없으면 고장 난 함수도 "잘 있다"로 보인다. */
+const isOurs = (e) => /[가-힣]/.test(`${e?.message || ""}`);
+
+/** 서버 함수 자체가 고장 났다 — 낡은 판이 남아 있을 때 이렇게 된다. */
+const isBroken = (e) => !isMissing(e) && !isOurs(e) &&
+  /ambiguous|does not exist|syntax error|invalid input|cannot change return type|relation .* does not/i
+    .test(`${e?.message || ""} ${e?.hint || ""}`);
+
 /** 사람이 읽을 수 있는 말로 바꾼다. 서버가 이미 한국어로 말했으면 그대로 둔다. */
 function explain(e, fallback) {
   if (!e) return fallback;
   if (isMissing(e)) return `서버에 대전 기능이 아직 없습니다. Supabase SQL Editor 에서 ${PATCH} 을 실행하세요.`;
+  if (isBroken(e)) return `서버에 낡은 대전 기능이 남아 있습니다. ${PATCH} 을 한 번 더 실행하세요.`;
   const m = e.message || "";
   if (/JWT|api key|Invalid.*key/i.test(m)) return "서버 열쇠가 맞지 않습니다. js/config.js 의 값을 다시 확인하세요.";
   if (/Failed to fetch|NetworkError|network/i.test(m)) return "서버에 닿지 못했습니다. 인터넷 연결을 확인하세요.";
@@ -246,10 +258,14 @@ const stepper = (id, name, cls, val) =>
 function formError(e, fallback) {
   const box = $("#formErr");
   // 패치가 없다는 말은 아래 목록이 더 자세히 한다 — 제목에서 파일 이름을 두 번 읽게 하지 않는다
-  const msg = isMissing(e) ? "서버에 대전 기능이 아직 없습니다." : explain(e, fallback);
+  const wants = isMissing(e) || isBroken(e);
+  const msg = isMissing(e) ? "서버에 대전 기능이 아직 없습니다."
+            : isBroken(e) ? "서버에 낡은 대전 기능이 남아 있습니다."
+            : explain(e, fallback);
   if (!box) { toast(msg); return; }
   box.hidden = false;
-  box.innerHTML = `<b>${esc(msg)}</b>${isMissing(e) ? patchList() : ""}`;
+  box.innerHTML = `<b>${esc(msg)}</b>` +
+    (wants ? patchList() + (isBroken(e) ? `<p class="lz-raw">${esc(e?.message || "")}</p>` : "") : "");
   // 창이 길면 알림이 접힌 아래쪽에 생긴다. 스스로 눈앞으로 올라오게 한다.
   box.scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
@@ -431,7 +447,9 @@ async function probe([name, , args]) {
     return { ok: true };
   } catch (e) {
     if (isMissing(e)) return { ok: false, why: "서버에 없습니다" };
-    return { ok: true, note: e?.message || "" };   // 거절당했다 = 있다
+    if (isOurs(e)) return { ok: true };            // 우리 규칙에 걸렸다 = 있고 제대로 돈다
+    // 한국어가 아닌 오류 = 함수는 있는데 고장 났다. 예전에는 이것을 '있다'로 셌다.
+    return { ok: false, why: e?.message || "고장 났습니다", broken: true };
   }
 }
 
@@ -453,7 +471,13 @@ async function serverCheck() {
     if (!row) return;                      // 점검 중에 창을 닫았다
     row.classList.add(r.ok ? "yes" : "no");
     row.querySelector(".lz-chk-mark").textContent = r.ok ? "✓" : "✗";
-    if (!r.ok) missing.push(need);
+    if (!r.ok) {
+      missing.push({ patch: need[3], broken: !!r.broken });
+      if (r.broken) {
+        row.classList.add("broken");
+        row.insertAdjacentHTML("beforeend", `<span class="lz-chk-why">${esc(r.why)}</span>`);
+      }
+    }
   }
 
   const out = $("#chkOut");
@@ -464,11 +488,13 @@ async function serverCheck() {
       <p>그래도 막힌다면 로그인 상태와 인터넷 연결을 확인해 보세요.</p>`;
     return;
   }
-  const files = [...new Set(missing.map((m) => m[3]))];
-  out.innerHTML = `<b class="bad">${missing.length}가지가 서버에 없습니다.</b>
-    <p>아래 파일을 Supabase 대시보드 → <b>SQL Editor</b> 에서 한 번씩 실행하면 됩니다.
-       여러 번 실행해도 안전합니다.</p>
-    <ol class="lz-fix">${files.map((f) => `<li><code>${f}</code></li>`).join("")}</ol>`;
+  const files = [...new Set(missing.map((m) => m.patch))];
+  const broke = missing.filter((m) => m.broken).length;
+  out.innerHTML =
+    `<b class="bad">${broke ? `${broke}가지가 고장 났습니다` : `${missing.length}가지가 서버에 없습니다`}.</b>
+     <p>아래 파일을 Supabase 대시보드 → <b>SQL Editor</b> 에서 한 번씩 실행하면 됩니다.
+        ${broke ? "낡은 함수는 새 것으로 갈립니다. " : ""}여러 번 실행해도 안전합니다.</p>
+     <ol class="lz-fix">${files.map((f) => `<li><code>${f}</code></li>`).join("")}</ol>`;
 }
 
 /* ══════════════ 방 ══════════════ */

@@ -79,12 +79,23 @@ grant select on public.laser_open_rooms to anon, authenticated;
 
 /* ══════════════ 함수 ══════════════ */
 
+/* ── 만들기 전에 지운다 ──
+   create or replace 는 돌려주는 값의 모양이 달라지면 실패한다("cannot change return
+   type of existing function"). 그러면 SQL Editor 는 거기서 멈추고, 서버에는 예전 함수가
+   그대로 남는다. 실제로 그렇게 됐다 — 첫 배포판의 laser_room_create 는
+   returns table (id uuid, code text) 였고, 그 id 라는 이름이 profiles.id 와 부딪쳐
+   "column reference id is ambiguous" 로 죽었다. 고친 판을 올리려 해도 반환형이 달라
+   갈아 끼울 수 없었으니, 고치는 패치를 아무리 실행해도 서버는 계속 옛것을 썼다.
+
+   먼저 지우고 새로 만들면 그 벽이 없다. 권한은 파일 끝에서 다시 준다. */
+
 /* jsonb 로 돌려준다.
    returns table (id uuid, code text) 로 두면 plpgsql 이 id · code 라는 변수를 만드는데,
    그 이름이 laser_rooms 의 열 이름과 같다. 그래서 아래
      exit when not exists (select 1 from public.laser_rooms where code = c);
    의 code 가 열인지 변수인지 갈리지 않아 "column reference is ambiguous" 로 죽는다.
    출력 이름을 없애면 그 충돌 자체가 사라진다. */
+drop function if exists public.laser_room_create(text, boolean, text, int, int, int, int);
 create or replace function public.laser_room_create(
   p_title text, p_private boolean, p_join_code text,
   p_max int, p_low int, p_mid int, p_high int
@@ -124,6 +135,7 @@ begin
   return jsonb_build_object('id', r.id, 'code', r.code);
 end $$;
 
+drop function if exists public.laser_room_join(text, text);
 create or replace function public.laser_room_join(p_code text, p_pass text default null)
 returns uuid
 language plpgsql security definer set search_path = '' as $$
@@ -152,6 +164,7 @@ begin
 end $$;
 
 /* 방 상태. join_code 는 돌려주지 않는다. */
+drop function if exists public.laser_room_state(uuid);
 create or replace function public.laser_room_state(p_room uuid)
 returns jsonb
 language plpgsql security definer set search_path = '' as $$
@@ -182,6 +195,7 @@ end $$;
 
 /* 방장이 시작한다. 판 묶음은 클라이언트가 뽑아 보내고 서버가 못박는다 —
    모두가 같은 판을 봐야 하므로, 한 번 정해지면 바꿀 수 없다. */
+drop function if exists public.laser_room_start(uuid, text);
 create or replace function public.laser_room_start(p_room uuid, p_boards text)
 returns void
 language plpgsql security definer set search_path = '' as $$
@@ -201,6 +215,7 @@ begin
 end $$;
 
 /* 몇 판째 깼는지 알린다. 뒤로 가지는 않는다. */
+drop function if exists public.laser_room_progress(uuid, int);
 create or replace function public.laser_room_progress(p_room uuid, p_solved int)
 returns void
 language plpgsql security definer set search_path = '' as $$
@@ -213,6 +228,7 @@ end $$;
 
 /* 전부 깼다. 처음 다 깬 사람이 이긴다.
    점수 계산은 여기서 한다 — 클라이언트가 보내는 값을 믿을 수 없다. */
+drop function if exists public.laser_room_finish(uuid, int);
 create or replace function public.laser_room_finish(p_room uuid, p_ms int)
 returns jsonb
 language plpgsql security definer set search_path = '' as $$
@@ -280,6 +296,7 @@ begin
 end $$;
 
 /* 나가기. 방장이 나가면 기다리던 방은 사라진다. */
+drop function if exists public.laser_room_leave(uuid);
 create or replace function public.laser_room_leave(p_room uuid)
 returns void
 language plpgsql security definer set search_path = '' as $$
@@ -294,6 +311,7 @@ begin
 end $$;
 
 /* 내 급수 */
+drop function if exists public.laser_my_rating();
 create or replace function public.laser_my_rating()
 returns jsonb
 language sql stable security definer set search_path = '' as $$
@@ -304,6 +322,7 @@ language sql stable security definer set search_path = '' as $$
 $$;
 
 /* 급수 순위표 */
+drop function if exists public.laser_leaderboard(int);
 create or replace function public.laser_leaderboard(p_limit int default 100)
 returns table (rank bigint, username text, rating int, wins int, losses int)
 language sql stable security definer set search_path = '' as $$

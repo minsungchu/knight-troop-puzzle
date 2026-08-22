@@ -17,6 +17,17 @@ alter table public.type_progress drop constraint if exists type_progress_item_ch
 alter table public.type_progress add constraint type_progress_item_check
   check (item ~ '^(stage:([1-9]|10)|words|castle|copy)$');
 
+/* ── 만들기 전에 지운다 ──
+   create or replace 는 돌려주는 값의 모양이 달라지면 실패한다("cannot change return
+   type of existing function"). 그러면 SQL Editor 는 거기서 멈추고, 서버에는 예전 함수가
+   그대로 남는다. 실제로 그렇게 됐다 — 첫 배포판의 laser_room_create 는
+   returns table (id uuid, code text) 였고, 그 id 라는 이름이 profiles.id 와 부딪쳐
+   "column reference id is ambiguous" 로 죽었다. 고친 판을 올리려 해도 반환형이 달라
+   갈아 끼울 수 없었으니, 고치는 패치를 아무리 실행해도 서버는 계속 옛것을 썼다.
+
+   먼저 지우고 새로 만들면 그 벽이 없다. 권한은 파일 끝에서 다시 준다. */
+
+drop function if exists public.type_progress_set(text, int, int, int, int);
 create or replace function public.type_progress_set(
   p_item text, p_stars int, p_cpm int, p_acc int, p_score int)
 returns void
@@ -64,6 +75,7 @@ create policy type_writings_read on public.type_writings
   for select using (auth.uid() = user_id);
 -- 쓰기 정책 없음 → 아래 함수로만
 
+drop function if exists public.type_writing_list();
 create or replace function public.type_writing_list()
 returns table (id text, prompt text, body text, chars int, written_at timestamptz)
 language sql stable security definer set search_path = '' as $$
@@ -75,6 +87,7 @@ language sql stable security definer set search_path = '' as $$
 $$;
 
 /* 같은 id 면 덮어쓴다 — 이어 쓴 글이 두 벌이 되면 안 된다. */
+drop function if exists public.type_writing_save(text, text, text, timestamptz);
 create or replace function public.type_writing_save(
   p_id text, p_prompt text, p_body text, p_at timestamptz default null)
 returns void
@@ -99,6 +112,7 @@ begin
         chars = excluded.chars, written_at = excluded.written_at;
 end $$;
 
+drop function if exists public.type_writing_delete(text);
 create or replace function public.type_writing_delete(p_id text)
 returns void
 language sql security definer set search_path = '' as $$
@@ -161,6 +175,7 @@ create or replace view public.type_open_rooms as
 grant select on public.type_open_rooms to anon, authenticated;
 
 /* 방 만들기. 대결은 1:1 뿐이라 정원을 받지 않는다. */
+drop function if exists public.type_room_create(text, text);
 create or replace function public.type_room_create(p_title text, p_mode text)
 returns jsonb
 language plpgsql security definer set search_path = '' as $$
@@ -189,6 +204,7 @@ begin
   return jsonb_build_object('id', r.id, 'code', r.code);
 end $$;
 
+drop function if exists public.type_room_join(text);
 create or replace function public.type_room_join(p_code text)
 returns uuid
 language plpgsql security definer set search_path = '' as $$
@@ -212,6 +228,7 @@ begin
   return r.id;
 end $$;
 
+drop function if exists public.type_room_state(uuid);
 create or replace function public.type_room_state(p_room uuid)
 returns jsonb
 language plpgsql security definer set search_path = '' as $$
@@ -241,6 +258,7 @@ end $$;
 
 /* 방장이 시작한다. 판은 클라이언트가 뽑아 보내고 서버가 못박는다 —
    두 사람이 같은 글, 같은 적을 같은 순서로 받아야 겨루기가 성립한다. */
+drop function if exists public.type_room_start(uuid, text, int);
 create or replace function public.type_room_start(p_room uuid, p_payload text, p_total int)
 returns void
 language plpgsql security definer set search_path = '' as $$
@@ -265,6 +283,7 @@ begin
 end $$;
 
 /* 어디까지 갔는지 알린다. 뒤로 가지는 않는다. */
+drop function if exists public.type_room_progress(uuid, int);
 create or replace function public.type_room_progress(p_room uuid, p_progress int)
 returns void
 language plpgsql security definer set search_path = '' as $$
@@ -278,6 +297,7 @@ end $$;
 /* 끝났다고 알린다. 다 해낸 사람은 p_done 을 true 로 준다.
    성이 무너져 더 못 가는 경우도 여기로 오지만 done 은 false 다.
    두 사람이 다 끝나면 방이 닫히고 전적이 매겨진다. */
+drop function if exists public.type_room_finish(uuid, int, boolean);
 create or replace function public.type_room_finish(p_room uuid, p_ms int, p_done boolean)
 returns jsonb
 language plpgsql security definer set search_path = '' as $$
@@ -336,6 +356,7 @@ end $$;
 
 /* 한 판 더. 끝난 방을 그대로 다시 쓴다 — 아이 둘이 계속 놀려면 방을 다시 만들게
    해서는 안 된다. 방장만 누를 수 있고, 판은 새로 뽑아 넘긴다. */
+drop function if exists public.type_room_rematch(uuid);
 create or replace function public.type_room_rematch(p_room uuid)
 returns void
 language plpgsql security definer set search_path = '' as $$
@@ -354,6 +375,7 @@ begin
    where id = p_room;
 end $$;
 
+drop function if exists public.type_room_leave(uuid);
 create or replace function public.type_room_leave(p_room uuid)
 returns void
 language plpgsql security definer set search_path = '' as $$
@@ -369,6 +391,7 @@ begin
   end if;
 end $$;
 
+drop function if exists public.type_my_duel_record();
 create or replace function public.type_my_duel_record()
 returns jsonb
 language sql stable security definer set search_path = '' as $$
