@@ -10,6 +10,7 @@ import * as Progress from "./progress.js";
 import * as Topics from "./topics.js";
 import * as Lang from "./lang.js";
 import * as Trainer from "./trainer.js";
+import * as Saving from "../saving.js";
 
 const COUNT = 20;        // 한 판에 치는 낱말 수
 const PER_LINE = 5;
@@ -51,6 +52,7 @@ export function draw() {
 }
 
 function play() {
+  if (Saving.askOnce("별과 최고 기록", () => play())) return;   // 고르고 나서 시작한다
   const en = Lang.isEn();
   const run = en ? buildEnWordRun(Lang.words(), COUNT) : buildWordRun(Topics.words(), COUNT);
   Lang.apply();

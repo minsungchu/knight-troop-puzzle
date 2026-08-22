@@ -12,12 +12,21 @@ import * as Write from "./write.js";
 import * as Castle from "./castle.js";
 import * as Lang from "./lang.js";
 import * as Duel from "./duel.js";
+import * as Saving from "../saving.js";
 import { isTouch } from "./input.js";
 
 $$(".tab[data-tab]").forEach((b) => { b.onclick = () => showTab(b.dataset.tab); });
 
 Sfx.listenForGesture();
 Auth.init();
+/* 혼자 하는 익히기·낱말·성 지키기도 기록은 계정에 남아야 한다. 지금 어디에 남는지 적어 둔다. */
+Saving.mount("#saveNote", {
+  sources: [
+    { src: Progress, patch: "supabase/patch-04-type.sql" },
+    { src: Writings, patch: "supabase/patch-05-type-write-duel.sql" },
+  ],
+  what: "별·기록과 쓴 글",
+});
 Progress.load();
 Writings.load();
 

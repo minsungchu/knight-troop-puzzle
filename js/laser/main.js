@@ -5,6 +5,8 @@ import * as Sfx from "../sound.js";
 import * as Solo from "./solo.js";
 import * as Versus from "./versus.js";
 import * as Rank from "./rank.js";
+import * as Progress from "./progress.js";
+import * as Saving from "../saving.js";
 
 $$(".tab[data-tab]").forEach((b) => { b.onclick = () => showTab(b.dataset.tab); });
 
@@ -13,6 +15,10 @@ $$(".tab[data-tab]").forEach((b) => { b.onclick = () => showTab(b.dataset.tab); 
 Sfx.listenForGesture();
 
 Auth.init();
+/* 혼자 하기도 기록은 계정에 남아야 한다. 지금 어디에 남는지 화면 위에 적어 둔다. */
+Saving.mount("#saveNote", {
+  src: Progress, patch: "supabase/patch-02-laser.sql", what: "등반 기록",
+});
 Solo.bind();
 Solo.init();
 Versus.init();

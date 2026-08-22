@@ -6,6 +6,9 @@
  * 로그인하는 순간 둘을 합친다. 합칠 때는 각 단계의 '더 빠른 기록'을 남긴다.
  * 진행을 지우는 쪽으로는 절대 합치지 않는다 — 다른 기기에서 올라간 것을
  * 이 기기의 빈 기록으로 덮으면 안 된다.
+ *
+ * 저장이 됐는지 안 됐는지는 밖에서 물어볼 수 있게 열어 둔다(state). 예전에는 서버가
+ * 거절해도 콘솔에 한 줄 적고 말았다 — 아이는 다 저장된 줄 알고 계속 올라갔다.
  */
 
 import { client, ONLINE, uid, onAuth } from "../supabase.js";
@@ -15,6 +18,18 @@ const KEY = "laser-progress:v1";
 /** stage(number) → 최고 기록(ms) */
 let times = new Map();
 let syncing = null;
+
+/* 서버 저장이 지금 되고 있는가. pending 은 아직 못 올린 기록 수. */
+let health = { ok: true, why: "", pending: 0 };
+export const state = () => ({ ...health });
+function setHealth(next) {
+  if (next.ok === health.ok && next.why === health.why && next.pending === health.pending) return;
+  health = next;
+  document.dispatchEvent(new CustomEvent("save-state"));
+}
+
+/** 못 올린 것을 다시 올린다. 서버 것과 합치는 길이 곧 다시 올리는 길이다. */
+export const retry = () => pull();
 
 function readLocal() {
   try {
@@ -55,21 +70,31 @@ async function pull() {
       times = merged;
       writeLocal();
       // 이 기기에만 있던 것을 서버로 올린다
-      for (const [stage, ms] of changed) await push(stage, ms);
+      let bad = 0, why = "";
+      for (const [stage, ms] of changed) {
+        const r = await push(stage, ms);
+        if (!r.ok) { bad++; why = r.why; }
+      }
+      setHealth(bad ? { ok: false, why, pending: bad } : { ok: true, why: "", pending: 0 });
       document.dispatchEvent(new CustomEvent("laser-progress"));
     } catch (e) {
       console.warn("진행 동기화 실패", e);
+      setHealth({ ok: false, why: e?.message || "", pending: health.pending });
     } finally { syncing = null; }
   })();
   return syncing;
 }
 
 async function push(stage, ms) {
-  if (!ONLINE || !uid()) return;
+  if (!ONLINE || !uid()) return { ok: true };
   try {
     const { error } = await (await client()).rpc("laser_progress_set", { p_stage: stage, p_ms: ms });
     if (error) throw error;
-  } catch (e) { console.warn("진행 저장 실패", e); }
+    return { ok: true };
+  } catch (e) {
+    console.warn("진행 저장 실패", e);
+    return { ok: false, why: e?.message || String(e) };
+  }
 }
 
 /** 깬 단계 번호들 */
@@ -84,5 +109,9 @@ export async function clearStage(stage, ms) {
   if (prev !== undefined && prev <= ms) return;   // 기록은 나아질 때만 덮는다
   times.set(stage, ms);
   writeLocal();
-  await push(stage, ms);
+  const r = await push(stage, ms);
+  if (ONLINE && uid()) {
+    setHealth(r.ok ? { ok: true, why: "", pending: 0 }
+                   : { ok: false, why: r.why, pending: health.pending + 1 });
+  }
 }

@@ -14,6 +14,7 @@ import * as Progress from "./progress.js";
 import * as Topics from "./topics.js";
 import { shuffle } from "./curriculum.js";
 import { run, CASTLE_SVG, hearts } from "./castlefield.js";
+import * as Saving from "../saving.js";
 
 const MAX_HP = 5;
 
@@ -67,6 +68,8 @@ export function home() {
 export function stop() { game?.field.stop(); game = null; }
 
 function play() {
+  // 성 지키기는 시작하는 순간 적이 걸어온다 — 물을 것이 있으면 묻고 나서 연다
+  if (Saving.askOnce("최고 점수", () => play())) return;
   Lang.ko();          // 성 지키기는 한글 낱말만 쓴다
   homeEl.hidden = true;
   playEl.hidden = false;
