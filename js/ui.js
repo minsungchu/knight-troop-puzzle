@@ -32,8 +32,11 @@ export function veil(html, opts) {
   card.innerHTML = html;
   $("#veil").classList.add("show");
   veilOpen = true;
+  card.scrollTop = 0;
+  /* 첫 칸으로 초점을 옮기되 화면은 건드리지 않는다. 긴 대화상자에서는 첫 단추가 맨 아래에
+     있을 수 있는데, 그냥 focus() 하면 브라우저가 거기까지 스크롤해 제목이 잘려 나간다. */
   const first = card.querySelector("input, button");
-  if (first) setTimeout(() => first.focus(), 30);
+  if (first) setTimeout(() => first.focus({ preventScroll: true }), 30);
   return card;
 }
 
@@ -45,6 +48,22 @@ export function hideVeil() {
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && veilOpen && !$("#veil").dataset.locked) hideVeil();
 });
+
+/* ── 조용히 죽지 않게 ──
+   어딘가에서 붙잡히지 않은 오류가 나면 그 뒤의 코드가 통째로 멈춘다. 화면은 멀쩡한데
+   무엇을 눌러도 아무 일이 없는 상태가 되고, 그것을 보는 사람에게는 원인을 찾을 실마리가
+   하나도 없다. 콘솔은 폰에서 열 수도 없다. 무슨 일이 났는지 화면으로 말한다. */
+const said = new Set();
+function surface(what, err) {
+  const msg = (err && (err.message || err.reason?.message || err.reason)) || err || "알 수 없는 오류";
+  const key = String(msg).slice(0, 120);
+  if (said.has(key)) return;               // 같은 오류로 화면을 도배하지 않는다
+  said.add(key);
+  console.error(what, err);
+  toast(`문제가 생겼습니다 — ${key}`);
+}
+window.addEventListener("error", (e) => surface("error", e.error || e.message));
+window.addEventListener("unhandledrejection", (e) => surface("unhandledrejection", e.reason));
 
 /* ── 탭 ── */
 const tabListeners = [];

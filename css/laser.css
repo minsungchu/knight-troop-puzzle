@@ -267,7 +267,10 @@
 /* ── 대화상자 (방 만들기 · 들어가기) ──
    여기 입력칸들은 스타일이 하나도 없어 브라우저 기본으로 나왔다. 어두운 판 위에
    흰 상자가 뜨고, 가운데 정렬 때문에 이름표와 칸이 한 줄에 뒤엉켰다. */
-#card:has(.lz-form){text-align:left; padding:26px 24px; width:min(440px,92vw)}
+/* 창이 화면보다 길어질 수 있다 — 그때 넘치는 쪽은 위아래 양쪽이라, 스크롤 없이는
+   제목도 첫 칸도 손에 닿지 않는다. 창 안에서 구르게 한다. */
+#card:has(.lz-form){text-align:left; padding:26px 24px; width:min(440px,92vw);
+  max-height:88vh; overflow-y:auto}
 #card:has(.lz-form) h2{text-align:center; margin-bottom:18px}
 .lz-form{display:flex; flex-direction:column; gap:16px}
 .lz-fld{display:flex; flex-direction:column; gap:7px}
@@ -323,6 +326,43 @@
   border-radius:8px; padding:11px 10px; min-height:46px; cursor:pointer;
 }
 
+/* ── 왜 막혔는지 ──
+   대화상자 안에 남는 자리. 토스트는 2.6초면 사라져서, 폰에서 눈을 한 번 돌리면
+   아무 일도 없었던 것처럼 보였다. 여기 적힌 것은 다시 누를 때까지 남는다. */
+.lz-form-err{
+  margin-top:16px; padding:13px 14px; border-radius:9px;
+  background:rgba(224,87,109,.09); border:1px solid rgba(224,87,109,.42);
+  font-size:13px; color:var(--parch); line-height:1.75;
+}
+.lz-form-err[hidden]{display:none}
+.lz-form-err b{display:block; color:#f0899a; font-size:13.5px; margin-bottom:2px}
+.lz-fix{margin:9px 0 0 18px; line-height:1.95; font-size:12.5px; color:var(--mist)}
+.lz-fix code{font-size:12px; color:var(--brass); word-break:break-all}
+.lz-form-err p, .lz-blocked .hint p{margin:8px 0 0; font-size:12.5px; color:var(--mist); line-height:1.75}
+.lz-why{color:var(--parch) !important; font-size:13.5px !important}
+.lz-thin{opacity:.82}
+
+/* ── 서버 점검 ── */
+#card:has(.lz-probe){text-align:left; padding:26px 24px; width:min(440px,92vw);
+  max-height:88vh; overflow-y:auto}
+#card:has(.lz-probe) h2{text-align:center; margin-bottom:10px}
+.lz-probe-say{font-size:12.5px; color:var(--mist); line-height:1.75; margin:0 0 16px}
+.lz-probe{display:flex; flex-direction:column; gap:6px}
+.lz-chk{display:flex; align-items:center; gap:10px; padding:9px 11px; border-radius:8px;
+  background:rgba(9,15,25,.5); border:1px solid rgba(201,151,63,.16)}
+.lz-chk-mark{width:20px; text-align:center; font-size:15px; color:var(--mist)}
+.lz-chk.yes .lz-chk-mark{color:#63c08a}
+.lz-chk.no{border-color:rgba(224,87,109,.45); background:rgba(224,87,109,.08)}
+.lz-chk.no .lz-chk-mark{color:#e0576d}
+.lz-chk-say{flex:1; font-size:13.5px; color:var(--parch)}
+.lz-chk code{font-size:11px; color:#5f7189; word-break:break-all}
+.lz-probe-out{margin-top:16px; padding:13px 14px; border-radius:9px;
+  background:rgba(9,15,25,.6); border:1px solid rgba(201,151,63,.22); font-size:13px; line-height:1.75}
+.lz-probe-out[hidden]{display:none}
+.lz-probe-out b{display:block; margin-bottom:4px}
+.lz-probe-out .good{color:#63c08a}
+.lz-probe-out .bad{color:#f0899a}
+
 /* ══════════════ 좁은 화면 ══════════════ */
 @media (max-width:620px){
   .view[data-view="versus"] button:not(.tab),
@@ -344,6 +384,8 @@
   .lz-goal{font-size:12.5px; line-height:1.7}
   .lz-verdict{padding:20px 14px}
   .lz-verdict h2{font-size:21px}
-  #card:has(.lz-form){padding:22px 18px; width:94vw; max-width:94vw}
+  #card:has(.lz-form),
+  #card:has(.lz-probe){padding:22px 18px; width:94vw; max-width:94vw}
+  .lz-chk code{display:none}   /* 좁은 화면에서는 함수 이름까지 넣으면 줄이 넘친다 */
   .lz-form-act{flex-direction:column-reverse}
 }
