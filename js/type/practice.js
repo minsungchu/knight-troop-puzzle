@@ -10,6 +10,7 @@ import * as Progress from "./progress.js";
 import * as Topics from "./topics.js";
 import * as Lang from "./lang.js";
 import * as Trainer from "./trainer.js";
+import * as Saving from "../saving.js";
 
 let mapEl, playEl;
 
@@ -36,7 +37,7 @@ export function drawMap() {
     <div class="panel">
       <div class="panel-head">
         <h2>자리 익히기</h2>
-        <p>${en ? "홈 자리 <b>a s d f · j k l</b> 부터 시작한다" : "홈row 여덟 자리부터 시작한다"}.
+        <p>${en ? "홈 자리 <b>a s d f · j k l</b> 부터 시작한다" : "기본 자리 여덟 곳부터 시작한다"}.
            한 단계를 정확도 ${PASS_ACC}% 로 마치면 다음 자리가 열린다.
            빠르게 치면 별이 늘어난다 — 분당 ${CPM_2}타에 별 둘, ${CPM_3}타에 별 셋.</p>
       </div>
@@ -73,6 +74,7 @@ export function drawMap() {
 }
 
 function play(n) {
+  if (Saving.askOnce("별과 최고 기록", () => play(n))) return;   // 고르고 나서 시작한다
   const en = Lang.isEn();
   const stage = ladder().find((s) => s.n === n);
   if (!stage) return;

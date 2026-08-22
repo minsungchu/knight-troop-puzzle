@@ -9,6 +9,7 @@ import { LaserBoard } from "./board.js";
 import { drawMountain } from "./mountain.js";
 import * as Progress from "./progress.js";
 import * as Sfx from "../sound.js";
+import * as Saving from "../saving.js";
 
 const TOTAL = 100;
 
@@ -58,6 +59,9 @@ export function showMap() {
 function openStage(n) {
   const data = stages.find((s) => s.stage === n);
   if (!data) { toast("그 단계를 찾지 못했습니다."); return; }
+  // 로그인 안 했으면 한 번만 권한다. 고르고 나면 다시 불려 그때 판이 열린다 —
+  // 창을 읽는 동안 시계가 돌면 첫 기록이 그만큼 늦어진다.
+  if (Saving.askOnce("등반 기록", () => openStage(n))) return;
   cur = n;
   $("#lzMap").hidden = true;
   $("#lzPlay").hidden = false;

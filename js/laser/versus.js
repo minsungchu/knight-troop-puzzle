@@ -55,6 +55,46 @@ function explain(e, fallback) {
   return fallback + (m ? ` (${m})` : "");
 }
 
+/** 패치를 안 돌렸을 때 무엇을 실행해야 하는지 — 여러 곳에서 같은 말을 한다. */
+const patchList = () => `<ol class="lz-fix">
+    <li><code>${PATCH}</code> — 방과 급수</li>
+    <li><code>${PATCH6}</code> — 결과 남기기·한 판 더</li>
+  </ol>
+  <p>Supabase 대시보드 → <b>SQL Editor</b> 에서 차례로 한 번씩 실행하세요.
+     여러 번 실행해도 안전합니다.</p>`;
+
+/* 서버와 말하는 곳은 여기 하나다.
+ *
+ * 대답이 없으면 영원히 기다리지 않는다. 예전에는 요청이 걸린 채로 멈추면 눌린 단추가
+ * 눌린 그대로 굳어, 화면이 죽은 것처럼 보였다 — 무엇을 눌러도 아무 일도 일어나지 않고
+ * 왜 그런지도 알 수 없었다. 열두 셈을 세고도 답이 없으면 그 사실을 말한다.
+ *
+ * 열쇠 꾸러미를 가져오는 일(client())까지 함께 센다. 그 꾸러미는 인터넷에서 받아 오므로,
+ * 막힌 망에서는 서버에 닿기도 전에 여기서 멈출 수 있다. */
+const TIMEOUT = 12000;
+
+function inTime(work) {
+  let timer;
+  const late = new Promise((_, no) => {
+    timer = setTimeout(() => no(new Error(
+      "서버가 12초 안에 답하지 않았습니다. 인터넷 연결이나 Supabase 프로젝트 상태를 확인하세요.")), TIMEOUT);
+  });
+  return Promise.race([work, late]).finally(() => clearTimeout(timer));
+}
+
+async function call(fn, args) {
+  const { data, error } = await inTime((async () => (await client()).rpc(fn, args))());
+  if (error) throw error;
+  return data;
+}
+
+/** 표를 읽는다. 함수와 같은 시간 제한을 받는다. */
+async function read(table) {
+  const { data, error } = await inTime((async () => (await client()).from(table).select("*"))());
+  if (error) throw error;
+  return data || [];
+}
+
 /** 막힌 이유를 화면 한복판에 설명한다. */
 function blocked(title, body, retry) {
   $("#vsBody").innerHTML =
@@ -79,7 +119,7 @@ export async function init() {
 async function loadRating() {
   if (!ONLINE || !uid()) { myRating = BASE; return; }
   try {
-    const { data } = await (await client()).rpc("laser_my_rating");
+    const data = await call("laser_my_rating");
     if (data) { myRating = data.rating; paintRating(data); }
   } catch { /* 급수는 없어도 대전은 된다 */ }
 }
@@ -126,20 +166,13 @@ export async function renderLobby() {
      예전에는 이 오류를 삼켜서, 목록은 멀쩡해 보이는데 방 만들기만 실패했다. */
   let rooms = [];
   try {
-    const { data, error } = await (await client()).from("laser_open_rooms").select("*");
-    if (error) throw error;
-    rooms = data || [];
+    rooms = await read("laser_open_rooms");
   } catch (e) {
     console.warn(e);
     if (isMissing(e)) {
       blocked("서버에 대전 준비가 아직 안 됐습니다", `<div class="hint">
-        Supabase 대시보드 → <b>SQL Editor</b> 에서 아래 둘을 차례로 한 번씩 실행하세요.
-        여러 번 실행해도 안전합니다.
-        <ol style="margin:10px 0 0 18px; line-height:1.9">
-          <li><code>${PATCH}</code> — 방과 급수</li>
-          <li><code>${PATCH6}</code> — 결과 남기기·한 판 더</li>
-        </ol>
-        <p style="margin-top:10px">혼자 하기(등반)는 이것 없이도 그대로 됩니다.</p></div>`, true);
+        ${patchList()}
+        <p>혼자 하기(등반)는 이것 없이도 그대로 됩니다.</p></div>`, true);
       return;
     }
     blocked("열린 방을 불러오지 못했습니다",
@@ -163,6 +196,7 @@ export async function renderLobby() {
      <div class="lz-bar lz-hero-act">
        <button id="vsNew" class="on big">방 만들기</button>
        <button id="vsCode">코드로 들어가기</button>
+       <button id="vsCheck" class="lz-thin">서버 점검</button>
      </div>
      <div class="panel lz-pan">
        <h2>열린 방</h2>
@@ -189,6 +223,7 @@ export async function renderLobby() {
   loadRating();
   $("#vsNew").onclick = openCreate;
   $("#vsCode").onclick = () => openJoin("");
+  $("#vsCheck").onclick = serverCheck;
   body.querySelectorAll("[data-join]").forEach((b) => {
     b.onclick = () => (+b.dataset.priv ? openJoin(b.dataset.join) : join(b.dataset.join, null));
   });
@@ -203,6 +238,23 @@ const stepper = (id, name, cls, val) =>
      <output class="lz-step-n" id="${id}">${val}</output>
      <button type="button" class="lz-step-btn" data-step="${id}" data-by="1" aria-label="${name} 늘리기">+</button>
    </div>`;
+
+/* 실패한 이유는 대화상자 안에 남긴다.
+   토스트는 2.6초 뒤에 사라진다 — 폰에서는 그 사이에 눈을 돌리면 아무 일도 없었던 것처럼
+   보이고, 그것이 "눌러도 아무 반응이 없다"의 정체였다. 여기 적힌 것은 다시 누를 때까지
+   그대로 남는다. */
+function formError(e, fallback) {
+  const box = $("#formErr");
+  // 패치가 없다는 말은 아래 목록이 더 자세히 한다 — 제목에서 파일 이름을 두 번 읽게 하지 않는다
+  const msg = isMissing(e) ? "서버에 대전 기능이 아직 없습니다." : explain(e, fallback);
+  if (!box) { toast(msg); return; }
+  box.hidden = false;
+  box.innerHTML = `<b>${esc(msg)}</b>${isMissing(e) ? patchList() : ""}`;
+  // 창이 길면 알림이 접힌 아래쪽에 생긴다. 스스로 눈앞으로 올라오게 한다.
+  box.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+
+const formErrSlot = `<div class="lz-form-err" id="formErr" role="alert" hidden></div>`;
 
 function openCreate() {
   veil(`<h2>방 만들기</h2>
@@ -241,6 +293,7 @@ function openCreate() {
         <span class="lz-note">계정 비밀번호와 다른 것을 쓰세요. 이 암호는 그대로 저장됩니다.</span>
       </label>
     </div>
+    ${formErrSlot}
     <div class="lz-form-act">
       <button id="cGo" class="on">만들기</button>
       <button id="cNo">그만</button>
@@ -279,18 +332,26 @@ function openCreate() {
   $("#cGo").onclick = async () => {
     const priv = $("#cPriv").checked;
     const go = $("#cGo");
+    const was = go.textContent;
     go.disabled = true;
+    go.textContent = "만드는 중…";
+    $("#formErr").hidden = true;
     try {
-      const { data, error } = await (await client()).rpc("laser_room_create", {
+      const data = await call("laser_room_create", {
         p_title: $("#cTitle").value, p_private: priv,
         p_join_code: priv ? $("#cPass").value : null,
         p_max: max,
         p_low: val.cLow, p_mid: val.cMid, p_high: val.cHigh,
       });
-      if (error) throw error;
+      if (!data || !data.id) throw new Error("서버가 방 번호를 돌려주지 않았습니다.");
       hideVeil();
       await enter(data.id);
-    } catch (e) { go.disabled = false; toast(explain(e, "방을 만들지 못했습니다.")); }
+    } catch (e) {
+      console.warn(e);
+      go.disabled = false;
+      go.textContent = was;
+      formError(e, "방을 만들지 못했습니다.");
+    }
   };
 }
 
@@ -307,6 +368,7 @@ function openJoin(code) {
         <input id="jPass" maxlength="20" autocomplete="off">
       </label>
     </div>
+    ${formErrSlot}
     <div class="lz-form-act">
       <button id="jGo" class="on">들어가기</button>
       <button id="jNo">그만</button>
@@ -319,30 +381,132 @@ function openJoin(code) {
 }
 
 async function join(code, pass) {
+  const go = $("#jGo");
+  const was = go ? go.textContent : "";
+  if (go) { go.disabled = true; go.textContent = "들어가는 중…"; }
+  const box = $("#formErr");
+  if (box) box.hidden = true;
   try {
-    const { data, error } = await (await client()).rpc("laser_room_join", { p_code: code, p_pass: pass || null });
-    if (error) throw error;
+    const id = await call("laser_room_join", { p_code: code, p_pass: pass || null });
+    if (!id) throw new Error("서버가 방 번호를 돌려주지 않았습니다.");
     hideVeil();
-    await enter(data);
-  } catch (e) { toast(explain(e, "들어가지 못했습니다.")); }
+    await enter(id);
+  } catch (e) {
+    console.warn(e);
+    if (go) { go.disabled = false; go.textContent = was; }
+    formError(e, "들어가지 못했습니다.");
+  }
+}
+
+/* ══════════════ 서버 점검 ══════════════
+
+   대전이 안 될 때 막히는 곳은 거의 언제나 "그 함수가 서버에 아직 없다" 하나다.
+   그런데 눌러 본 사람은 어느 함수인지 알 길이 없었다. 여기서 필요한 것을 하나씩
+   불러 보고 있는지 없는지를 표로 보여 준다.
+
+   부르되 아무것도 바꾸지 않는다 — 없는 방 번호나 만들 수 없는 판 수를 주면,
+   서버는 무엇도 건드리기 전에 먼저 거절한다. 그 거절이 곧 "이 함수는 있다"는 답이다. */
+
+const NIL = "00000000-0000-0000-0000-000000000000";
+const NEEDS = [
+  ["laser_open_rooms", "열린 방 목록", null, PATCH],
+  ["laser_room_create", "방 만들기", { p_title: "", p_private: false, p_join_code: null, p_max: 2, p_low: 0, p_mid: 0, p_high: 0 }, PATCH],
+  ["laser_room_join", "방 들어가기", { p_code: "______", p_pass: null }, PATCH],
+  ["laser_room_state", "방 상태 읽기", { p_room: NIL }, PATCH],
+  ["laser_room_start", "대전 시작", { p_room: NIL, p_boards: "[]" }, PATCH],
+  ["laser_room_progress", "진행 알리기", { p_room: NIL, p_solved: 0 }, PATCH],
+  ["laser_room_finish", "끝내고 점수 매기기", { p_room: NIL, p_ms: 1 }, PATCH],
+  ["laser_room_leave", "방 나가기", { p_room: NIL }, PATCH],
+  ["laser_my_rating", "내 급수", {}, PATCH],
+  ["laser_room_rematch", "한 판 더", { p_room: NIL }, PATCH6],
+];
+
+async function probe([name, , args]) {
+  try {
+    if (args === null) {
+      await read(name);
+    } else {
+      await call(name, args);
+    }
+    return { ok: true };
+  } catch (e) {
+    if (isMissing(e)) return { ok: false, why: "서버에 없습니다" };
+    return { ok: true, note: e?.message || "" };   // 거절당했다 = 있다
+  }
+}
+
+async function serverCheck() {
+  veil(`<h2>서버 점검</h2>
+    <p class="lz-probe-say">대전에 필요한 것이 서버에 있는지 하나씩 불러 봅니다.
+       아무것도 바꾸지 않습니다.</p>
+    <div class="lz-probe" id="chkList">${NEEDS.map(([n, say]) =>
+      `<div class="lz-chk" data-n="${n}"><span class="lz-chk-mark">…</span>
+         <span class="lz-chk-say">${say}</span><code>${n}</code></div>`).join("")}</div>
+    <div class="lz-probe-out" id="chkOut" hidden></div>
+    <div class="lz-form-act"><button id="chkNo" class="on">닫기</button></div>`);
+  $("#chkNo").onclick = hideVeil;
+
+  const missing = [];
+  for (const need of NEEDS) {
+    const row = $(`.lz-chk[data-n="${need[0]}"]`);
+    const r = await probe(need);
+    if (!row) return;                      // 점검 중에 창을 닫았다
+    row.classList.add(r.ok ? "yes" : "no");
+    row.querySelector(".lz-chk-mark").textContent = r.ok ? "✓" : "✗";
+    if (!r.ok) missing.push(need);
+  }
+
+  const out = $("#chkOut");
+  if (!out) return;
+  out.hidden = false;
+  if (!missing.length) {
+    out.innerHTML = `<b class="good">서버는 준비돼 있습니다.</b>
+      <p>그래도 막힌다면 로그인 상태와 인터넷 연결을 확인해 보세요.</p>`;
+    return;
+  }
+  const files = [...new Set(missing.map((m) => m[3]))];
+  out.innerHTML = `<b class="bad">${missing.length}가지가 서버에 없습니다.</b>
+    <p>아래 파일을 Supabase 대시보드 → <b>SQL Editor</b> 에서 한 번씩 실행하면 됩니다.
+       여러 번 실행해도 안전합니다.</p>
+    <ol class="lz-fix">${files.map((f) => `<li><code>${f}</code></li>`).join("")}</ol>`;
 }
 
 /* ══════════════ 방 ══════════════ */
 
 async function enter(id) {
   room = { id };
-  await refresh();
+  misses = 0;
+  await refresh(true);
+  if (!room) return;              // 첫 읽기가 막혔다 — 이유는 화면에 적혀 있다
   await openChannel(id);
   clearInterval(poll);
   // 실시간이 끊겨도 방이 멈추지 않도록, 느슨하게 다시 확인한다
   poll = setInterval(refresh, 4000);
 }
 
-async function refresh() {
+/* 방 상태를 잇달아 못 읽은 횟수. 실시간이든 폴링이든 한 번쯤은 끊긴다 —
+   그때마다 방에서 튕겨 나오면 대전이 성립하지 않는다. */
+let misses = 0;
+
+/* 첫 읽기(first)와 그 뒤의 되읽기를 다르게 다룬다.
+   예전에는 어느 쪽이든 조용히 로비로 돌려보냈다. 방은 서버에 만들어졌는데 화면만
+   목록으로 돌아오니, 누른 사람 눈에는 "만들기를 눌러도 아무 일이 없다"로 보였다. */
+async function refresh(first) {
   if (!room) return;
+  let data;
   try {
-    const { data, error } = await (await client()).rpc("laser_room_state", { p_room: room.id });
-    if (error) throw error;
+    data = await call("laser_room_state", { p_room: room.id });
+    misses = 0;
+  } catch (e) {
+    console.warn(e);
+    if (first) { enterFailed(e); return; }
+    if (++misses < 3) return;                  // 잠깐 끊긴 것은 넘긴다
+    const why = explain(e, "방을 읽지 못했습니다.");
+    leaveLocal();
+    toast(why);
+    return;
+  }
+  try {
     room = { ...data, id: data.id };
 
     /* 세 가지 상태를 각각 다룬다. 예전에는 '진행 중이 아니면 대기실'로 뭉뚱그렸는데,
@@ -359,9 +523,22 @@ async function refresh() {
       renderRoom();
     }
   } catch (e) {
+    // 그린 뒤에 터진 것은 방 문제가 아니다 — 방은 두고 이유만 말한다
     console.warn(e);
-    leaveLocal();
+    toast("방 화면을 그리는 중에 문제가 생겼습니다: " + (e?.message || e));
   }
+}
+
+/** 만들거나 들어간 방을 처음부터 읽지 못했다. 왜인지 적고, 방은 놓아 준다. */
+function enterFailed(e) {
+  stopMatch();
+  closeChannel();
+  room = null;
+  blocked("방에 들어가지 못했습니다", `<div class="hint">
+    <p class="lz-why">${esc(explain(e, "방 상태를 읽지 못했습니다."))}</p>
+    ${isMissing(e) ? patchList() : ""}
+    <p>방 자체는 서버에 만들어졌을 수 있습니다. <b>다시 확인</b>을 누르면 목록에서 찾을 수 있습니다.</p>
+  </div>`, true);
 }
 
 async function openChannel(id) {
@@ -453,10 +630,7 @@ function drawBoards() {
 async function start() {
   try {
     const picked = drawBoards();
-    const { error } = await (await client()).rpc("laser_room_start", {
-      p_room: room.id, p_boards: JSON.stringify(picked),
-    });
-    if (error) throw error;
+    await call("laser_room_start", { p_room: room.id, p_boards: JSON.stringify(picked) });
     shout("state");
     await refresh();
   } catch (e) { toast(explain(e, "시작하지 못했습니다.")); }
@@ -560,7 +734,7 @@ function paintScoreboard() {
 async function onBoardWin() {
   Sfx.win?.();
   idx++;
-  try { await (await client()).rpc("laser_room_progress", { p_room: room.id, p_solved: idx }); } catch {}
+  try { await call("laser_room_progress", { p_room: room.id, p_solved: idx }); } catch (e) { console.warn(e); }
   shout("progress", { id: uid(), solved: idx });
 
   if (idx < boards.length) {
@@ -573,8 +747,7 @@ async function onBoardWin() {
   // 다 깼다
   const ms = Math.round(performance.now() - startedAt);
   try {
-    const { data } = await (await client()).rpc("laser_room_finish", { p_room: room.id, p_ms: ms });
-    deltas = data || null;
+    deltas = (await call("laser_room_finish", { p_room: room.id, p_ms: ms })) || null;
   } catch (e) { console.warn(e); }
   shout("state");
   await refresh();       // 방이 닫혔는지 확인하고 결과로 넘어간다
@@ -663,8 +836,7 @@ function paintResult() {
   if (again) again.onclick = async () => {
     again.disabled = true;
     try {
-      const { error } = await (await client()).rpc("laser_room_rematch", { p_room: room.id });
-      if (error) throw error;
+      await call("laser_room_rematch", { p_room: room.id });
       shout("state");
       await refresh();
     } catch (e) {
@@ -677,7 +849,7 @@ function paintResult() {
 /* ══════════════ 나가기 ══════════════ */
 
 async function leave() {
-  try { await (await client()).rpc("laser_room_leave", { p_room: room.id }); } catch {}
+  try { await call("laser_room_leave", { p_room: room.id }); } catch (e) { console.warn(e); }
   shout("state");
   leaveLocal();
 }

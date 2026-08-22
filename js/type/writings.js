@@ -15,6 +15,17 @@ const MAX_LEN = 4000;
 let list = [];        // [{id, prompt, text, chars, at}]  최근 것이 앞
 let syncing = null;
 
+/* 서버 보관이 지금 되고 있는가. 진행 기록과 같은 방식으로 밖에 알린다 —
+   쓴 글이 이 브라우저에만 있는데 저장된 줄 알면, 지워질 때 되돌릴 길이 없다. */
+let health = { ok: true, why: "", pending: 0 };
+export const state = () => ({ ...health });
+function setHealth(next) {
+  if (next.ok === health.ok && next.why === health.why && next.pending === health.pending) return;
+  health = next;
+  document.dispatchEvent(new CustomEvent("save-state"));
+}
+export const retry = () => pull();
+
 function readLocal() {
   try {
     const raw = JSON.parse(localStorage.getItem(KEY) || "[]");
@@ -52,7 +63,11 @@ export function save({ id, prompt, text }) {
   if (at >= 0) list[at] = row; else list.unshift(row);
   sortNewest();
   writeLocal();
-  push(row);
+  push(row).then((r) => {
+    if (!ONLINE || !uid()) return;
+    setHealth(r.ok ? { ok: true, why: "", pending: 0 }
+                   : { ok: false, why: r.why, pending: health.pending + 1 });
+  });
   document.dispatchEvent(new CustomEvent("type-writings"));
   return row;
 }
@@ -87,21 +102,32 @@ async function pull() {
       list = [...mine.values()];
       sortNewest();
       writeLocal();
-      for (const w of list) if (!server.has(w.id) || server.get(w.id).at < w.at) await push(w);
+      let bad = 0, why = "";
+      for (const w of list) {
+        if (server.has(w.id) && !(server.get(w.id).at < w.at)) continue;
+        const r = await push(w);
+        if (!r.ok) { bad++; why = r.why; }
+      }
+      setHealth(bad ? { ok: false, why, pending: bad } : { ok: true, why: "", pending: 0 });
       document.dispatchEvent(new CustomEvent("type-writings"));
     } catch (e) {
       console.warn("글 동기화 실패", e);
+      setHealth({ ok: false, why: e?.message || "", pending: health.pending });
     } finally { syncing = null; }
   })();
   return syncing;
 }
 
 async function push(row) {
-  if (!ONLINE || !uid()) return;
+  if (!ONLINE || !uid()) return { ok: true };
   try {
     const { error } = await (await client()).rpc("type_writing_save", {
       p_id: row.id, p_prompt: row.prompt, p_body: row.text, p_at: row.at,
     });
     if (error) throw error;
-  } catch (e) { console.warn("글 저장 실패", e); }
+    return { ok: true };
+  } catch (e) {
+    console.warn("글 저장 실패", e);
+    return { ok: false, why: e?.message || String(e) };
+  }
 }
