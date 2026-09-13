@@ -389,3 +389,10 @@
   .lz-chk code{display:none}   /* 좁은 화면에서는 함수 이름까지 넣으면 줄이 넘친다 */
   .lz-form-act{flex-direction:column-reverse}
 }
+
+/* 있기는 한데 고장 난 것 — 없는 것과 눈에 다르게 */
+.lz-chk.broken{flex-wrap:wrap}
+.lz-chk-why{flex-basis:100%; margin-left:30px; font-size:11.5px; color:#f0899a;
+  line-height:1.6; word-break:break-word}
+.lz-raw{margin-top:8px !important; font-family:var(--mono,ui-monospace,Menlo,monospace);
+  font-size:11px !important; color:#f0899a !important; word-break:break-word}

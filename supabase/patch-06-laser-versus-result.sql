@@ -24,10 +24,21 @@ alter table public.laser_rooms add column if not exists result jsonb;
 /* 전부 깼다. 처음 다 깬 사람이 이긴다.
    점수 계산은 여기서 한다 — 클라이언트가 보내는 값을 믿을 수 없다.
 
+/* ── 만들기 전에 지운다 ──
+   create or replace 는 돌려주는 값의 모양이 달라지면 실패한다("cannot change return
+   type of existing function"). 그러면 SQL Editor 는 거기서 멈추고, 서버에는 예전 함수가
+   그대로 남는다. 실제로 그렇게 됐다 — 첫 배포판의 laser_room_create 는
+   returns table (id uuid, code text) 였고, 그 id 라는 이름이 profiles.id 와 부딪쳐
+   "column reference id is ambiguous" 로 죽었다. 고친 판을 올리려 해도 반환형이 달라
+   갈아 끼울 수 없었으니, 고치는 패치를 아무리 실행해도 서버는 계속 옛것을 썼다.
+
+   먼저 지우고 새로 만들면 그 벽이 없다. 권한은 파일 끝에서 다시 준다. */
+
    patch-03 과 달라진 곳:
      · 이미 닫힌 방이면 튕기지 않고 적어 둔 결과를 그대로 돌려준다.
        늦게 끝낸 사람도 자기 등수와 점수 변화를 볼 수 있어야 한다.
      · 매긴 결과를 laser_rooms.result 에 적는다. */
+drop function if exists public.laser_room_finish(uuid, int);
 create or replace function public.laser_room_finish(p_room uuid, p_ms int)
 returns jsonb
 language plpgsql security definer set search_path = '' as $$
@@ -111,6 +122,7 @@ end $$;
 
 /* 결과를 함께 싣는다 — 진 사람도 자기 등수와 점수 변화를 봐야 한다.
    join_code 는 여전히 돌려주지 않는다. */
+drop function if exists public.laser_room_state(uuid);
 create or replace function public.laser_room_state(p_room uuid)
 returns jsonb
 language plpgsql security definer set search_path = '' as $$
@@ -144,6 +156,7 @@ end $$;
 
 /* 끝난 방을 그대로 되돌린다. 판 묶음은 비운다 — 다시 시작할 때 새로 뽑아야
    같은 방에서 두 번 놀아도 같은 판이 나오지 않는다. */
+drop function if exists public.laser_room_rematch(uuid);
 create or replace function public.laser_room_rematch(p_room uuid)
 returns void
 language plpgsql security definer set search_path = '' as $$
@@ -169,6 +182,7 @@ grant execute on function public.laser_room_rematch(uuid) to authenticated;
 
 /* 이름을 안 적으면 '하늘 의 방' 처럼 조사 앞이 띄어져 있었다. 붙여 쓴다.
    나머지는 patch-03 과 같다. */
+drop function if exists public.laser_room_create(text, boolean, text, int, int, int, int);
 create or replace function public.laser_room_create(
   p_title text, p_private boolean, p_join_code text,
   p_max int, p_low int, p_mid int, p_high int

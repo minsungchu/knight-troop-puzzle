@@ -35,7 +35,18 @@ create policy profiles_read on public.profiles for select using (true);
 revoke select on public.profiles from anon, authenticated;
 grant  select (id, username, created_at) on public.profiles to anon, authenticated;
 
+/* ── 만들기 전에 지운다 ──
+   create or replace 는 돌려주는 값의 모양이 달라지면 실패한다("cannot change return
+   type of existing function"). 그러면 SQL Editor 는 거기서 멈추고, 서버에는 예전 함수가
+   그대로 남는다. 실제로 그렇게 됐다 — 첫 배포판의 laser_room_create 는
+   returns table (id uuid, code text) 였고, 그 id 라는 이름이 profiles.id 와 부딪쳐
+   "column reference id is ambiguous" 로 죽었다. 고친 판을 올리려 해도 반환형이 달라
+   갈아 끼울 수 없었으니, 고치는 패치를 아무리 실행해도 서버는 계속 옛것을 썼다.
+
+   먼저 지우고 새로 만들면 그 벽이 없다. 권한은 파일 끝에서 다시 준다. */
+
 -- 이 기기를 '현재 자리'로 등록한다
+drop function if exists public.claim_session(uuid);
 create or replace function public.claim_session(p_token uuid)
 returns void
 language plpgsql security definer set search_path = '' as $$
@@ -45,6 +56,7 @@ begin
 end $$;
 
 -- 이 기기가 아직 유효한 자리인지 서버에서 대조한다 (토큰 값은 밖으로 나가지 않는다)
+drop function if exists public.session_ok(uuid);
 create or replace function public.session_ok(p_token uuid)
 returns boolean
 language sql stable security definer set search_path = '' as $$
@@ -96,6 +108,7 @@ create policy scores_read on public.scores for select using (true);
 -- insert / update / delete 정책 없음 → 등록은 submit_score() 로만, 수정·삭제는 아무도 못 한다
 
 -- 기록 등록. 이름은 서버가 프로필에서 채운다.
+drop function if exists public.submit_score(int, int, int, int, uuid);
 create or replace function public.submit_score(
   p_size int, p_level int, p_ms int, p_hints int, p_room uuid default null
 ) returns bigint
@@ -114,6 +127,7 @@ begin
 end $$;
 
 -- 보드별 랭킹 — 사용자마다 최고기록 1건씩만
+drop function if exists public.leaderboard(int, int, int);
 create or replace function public.leaderboard(p_size int, p_level int, p_limit int default 100)
 returns table (rank bigint, username text, ms int, created_at timestamptz)
 language sql stable security definer set search_path = '' as $$
@@ -129,6 +143,7 @@ language sql stable security definer set search_path = '' as $$
 $$;
 
 -- 내 순위 (상위 목록 밖일 때 따로 붙여 보여 주기 위해)
+drop function if exists public.my_rank(int, int);
 create or replace function public.my_rank(p_size int, p_level int)
 returns table (rank bigint, ms int, created_at timestamptz)
 language sql stable security definer set search_path = '' as $$
@@ -146,6 +161,7 @@ language sql stable security definer set search_path = '' as $$
 $$;
 
 -- 내 전체 기록 (힌트 쓴 판 포함)
+drop function if exists public.my_scores(int);
 create or replace function public.my_scores(p_limit int default 50)
 returns table (size int, level int, ms int, hints_used int, room_id uuid, created_at timestamptz)
 language sql stable security definer set search_path = '' as $$
@@ -212,6 +228,7 @@ grant select on public.open_rooms to anon, authenticated;
 
 
 -- 방 만들기
+drop function if exists public.create_room(text, boolean, text, int, int, int);
 create or replace function public.create_room(
   p_title text, p_private boolean, p_pass text, p_max int, p_size int, p_level int
 ) returns json
@@ -248,6 +265,7 @@ end $$;
 
 
 -- 입장 — 정원·암호·상태를 서버가 확인한다
+drop function if exists public.join_room(text, text);
 create or replace function public.join_room(p_code text, p_pass text default null)
 returns uuid
 language plpgsql security definer set search_path = '' as $$
@@ -279,6 +297,7 @@ end $$;
 
 
 -- 방 상태 — 참가자만 볼 수 있고, join_code 는 절대 나가지 않는다
+drop function if exists public.room_state(uuid);
 create or replace function public.room_state(p_room uuid)
 returns json
 language plpgsql security definer set search_path = '' as $$
@@ -310,6 +329,7 @@ end $$;
 -- 시작 — 방장이 직접 만든 퍼즐을 배포한다.
 -- 시드만 공유하면 안 된다: 퍼즐 생성이 Date.now() 로 탐색을 끊기 때문에
 -- 같은 시드라도 기기 속도에 따라 다른 퍼즐이 나온다.
+drop function if exists public.start_room(uuid, text, text);
 create or replace function public.start_room(p_room uuid, p_puzzle text, p_solution text)
 returns timestamptz
 language plpgsql security definer set search_path = '' as $$
@@ -335,6 +355,7 @@ end $$;
 
 
 -- 완주 — 등수를 돌려준다
+drop function if exists public.finish_room(uuid, int, int);
 create or replace function public.finish_room(p_room uuid, p_ms int, p_hints int)
 returns int
 language plpgsql security definer set search_path = '' as $$
@@ -362,6 +383,7 @@ end $$;
 
 
 -- 나가기
+drop function if exists public.leave_room(uuid);
 create or replace function public.leave_room(p_room uuid)
 returns void
 language plpgsql security definer set search_path = '' as $$
@@ -381,6 +403,7 @@ end $$;
 
 
 -- 내가 지금 들어가 있는 방 (새로고침 복귀용)
+drop function if exists public.my_room();
 create or replace function public.my_room()
 returns uuid
 language sql stable security definer set search_path = '' as $$
