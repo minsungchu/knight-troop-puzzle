@@ -379,13 +379,21 @@ function buildNpc(id, n) {
 
 /* ══════════════ 조각 ══════════════ */
 
-/** 칠교 조각 한 개의 3D 모양. 무게중심이 원점이고 바닥에 눕혀 있다. */
-export function pieceMesh(kind, color, scale = U) {
+/** 칠교 조각 한 개의 3D 모양. 무게중심이 원점이고 바닥에 눕혀 있다.
+ *
+ *  flat 은 제단에서 틀에 맞출 때 쓴다. 틀과 크기가 똑같아 보여야 하므로
+ *   · 모서리 둥글리기(bevel)를 뺀다 — 둥글린 만큼 사방으로 3cm씩 틀 밖으로 튀어나왔다
+ *   · 얇게 한다 — 두꺼우면 윗면이 카메라에 가까워 원근 때문에 틀보다 커 보였다
+ *   · 그림자를 끈다 — 판에 비껴 드리운 그림자가 조각을 떠 보이고 더 커 보이게 했다
+ *  마을 바닥에 떨어진 조각은 찾기 쉽게 도톰한 그대로 둔다. */
+export function pieceMesh(kind, color, scale = U, flat = false) {
   const shape = new THREE.Shape(local(kind).map(([x, y]) => new THREE.Vector2(x * scale, y * scale)));
-  const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.14, bevelEnabled: true, bevelSize: 0.03, bevelThickness: 0.03, bevelSegments: 1 });
+  const geo = new THREE.ExtrudeGeometry(shape, flat
+    ? { depth: 0.03, bevelEnabled: false }
+    : { depth: 0.14, bevelEnabled: true, bevelSize: 0.03, bevelThickness: 0.03, bevelSegments: 1 });
   geo.rotateX(-Math.PI / 2);           // 모양의 y 가 북쪽(-z), 두께가 위(+y)
   const m = new THREE.Mesh(geo, mat(color, { roughness: 0.55 }));
-  m.castShadow = true;
+  m.castShadow = !flat;
   const g = new THREE.Group();         // 돌리기는 바깥, 뒤집기는 안쪽에서
   g.add(m);
   g.userData.inner = m;
