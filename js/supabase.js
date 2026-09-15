@@ -143,7 +143,7 @@ function watchSession() {
     const ch = sb.channel(`user:${uid()}`, { config: { broadcast: { self: false } } });
     sessionChannel = ch;
     ch.on("broadcast", { event: "claim" }, ({ payload }) => {
-      if (payload && payload.token !== TabStore.get(SESSION_KEY)) kicked(payload.browser === browserId() ? "tab" : "device");
+      if (payload && payload.token !== TabStore.get(SESSION_KEY)) kicked(!payload.browser ? "unknown" : payload.browser === browserId() ? "tab" : "device");
     });
 
     return new Promise((resolve) => {
@@ -180,7 +180,8 @@ function browserId() {
    로그아웃됐다. 탭 둘을 열면 둘 다 풀리고, 다른 기기로 옮기면 새 기기도 곧 풀렸다.
      · 같은 브라우저의 다른 탭 — 세션은 그 탭 것이기도 하다. 이 탭 화면만 로그아웃한다.
      · 다른 기기 — 이 기기 세션만 끊는다(scope: local). 새 기기는 그대로 둔다.
-     · 모름(서버 대조로만 알게 됨) — 끊으면 같은 브라우저일 때 남까지 끊으니, 화면만 로그아웃한다.
+     · 모름(서버 대조로만 알게 됨, 또는 배포 전 코드가 돌던 탭이 브라우저 표 없이 알림) —
+       끊으면 같은 브라우저일 때 남까지 끊으니, 화면만 로그아웃한다.
    화면만 로그아웃한 탭은 새로고침하거나 다시 로그인하면 자리를 도로 가져간다 — 나중에 쓴 쪽이 이긴다. */
 async function kicked(from = "unknown") {
   kickListeners.forEach((fn) => { try { fn(from); } catch (e) { console.error(e); } });
