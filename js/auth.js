@@ -31,9 +31,11 @@ export function checkPw(v, id) {
 
 export function init() {
   onAuth(render);
-  onKicked(() => {
-    veil(`<h2>다른 기기에서 로그인했습니다</h2>
-      <p>한 계정은 한 곳에서만 접속할 수 있습니다.<br>이 화면은 로그아웃되었습니다.</p>
+  onKicked((from) => {
+    const where = from === "tab" ? "이 브라우저의 다른 탭" : "다른 곳";
+    veil(`<h2>${where}에서 이 계정을 쓰고 있습니다</h2>
+      <p>한 계정은 한 곳에서만 접속할 수 있습니다.<br>이 화면은 로그아웃되었습니다.
+      ${from === "tab" ? "<br>이 탭에서 계속하려면 새로고침하세요." : ""}</p>
       <div class="card-actions"><button class="btn primary" id="okBtn">확인</button></div>`);
     $("#okBtn").onclick = () => { hideVeil(); openLogin(); };
   });

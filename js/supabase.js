@@ -4,7 +4,7 @@
  * 앱은 '혼자 플레이' 모드로만 동작한다. 온라인 코드는 전부 이 파일을 거친다.
  */
 import { SUPABASE_URL, SUPABASE_ANON_KEY, ONLINE, SESSION_KEY, EMAIL_DOMAIN } from "./config.js";
-import { TabStore } from "./ui.js";
+import { Store, TabStore } from "./ui.js";
 
 export { ONLINE };
 
@@ -82,11 +82,16 @@ export async function refresh(opts) {
 export async function signOut(quiet) {
   const sb = await client();
   if (sb) await sb.auth.signOut();
+  leaveSeat();
+  if (!quiet) location.hash = "";
+}
+
+/* 이 탭을 로그아웃 상태로 돌린다. 저장된 세션은 건드리지 않는다. */
+function leaveSeat() {
   TabStore.del(SESSION_KEY);
   unwatchSession();
   me.user = null; me.profile = null;
   fireAuth();
-  if (!quiet) location.hash = "";
 }
 
 /* ══════════════ 동시접속 1곳 제한 ══════════════
@@ -97,7 +102,7 @@ export async function signOut(quiet) {
 let sessionChannel = null;
 let sessionReady = null;      // 진행 중이거나 끝난 구독 (Promise<boolean>)
 const kickListeners = [];
-/** 다른 기기에 밀려났을 때 호출된다. */
+/** 다른 기기나 다른 탭에 밀려났을 때 호출된다. 인자는 "device" | "tab" | "unknown". */
 export function onKicked(fn) { kickListeners.push(fn); }
 
 /** 로그인 직후 이 탭을 '현재 자리'로 등록한다. 나중에 부른 쪽이 이긴다.
@@ -122,7 +127,7 @@ async function doClaim() {
   // 그 경로는 realtime-js 가 없앨 예정이라고 경고한다.
   const ready = await watchSession();
   if (ready && sessionChannel) {
-    sessionChannel.send({ type: "broadcast", event: "claim", payload: { token } });
+    sessionChannel.send({ type: "broadcast", event: "claim", payload: { token, browser: browserId() } });
   }
 }
 
@@ -138,7 +143,7 @@ function watchSession() {
     const ch = sb.channel(`user:${uid()}`, { config: { broadcast: { self: false } } });
     sessionChannel = ch;
     ch.on("broadcast", { event: "claim" }, ({ payload }) => {
-      if (payload && payload.token !== TabStore.get(SESSION_KEY)) kicked();
+      if (payload && payload.token !== TabStore.get(SESSION_KEY)) kicked(!payload.browser ? "unknown" : payload.browser === browserId() ? "tab" : "device");
     });
 
     return new Promise((resolve) => {
@@ -161,9 +166,30 @@ function unwatchSession() {
   sessionReady = null;      // 다음 로그인은 새로 구독해야 한다
 }
 
-function kicked() {
-  kickListeners.forEach((fn) => { try { fn(); } catch (e) { console.error(e); } });
-  signOut(true);
+/* 같은 브라우저인지 가르는 표. localStorage 라 이 브라우저의 탭끼리는 같고 기기마다 다르다. */
+const BROWSER_KEY = "knight-troop-puzzle:browser";
+function browserId() {
+  let id = Store.get(BROWSER_KEY);
+  if (!id) { id = crypto.randomUUID(); Store.set(BROWSER_KEY, id); }
+  return id;
+}
+
+/* 밀려났을 때 무엇을 끊는가.
+   예전에는 sb.auth.signOut() 을 불렀다. 그 기본 범위는 'global' 이라 이 계정의 모든 세션이
+   끊겼고, 같은 브라우저의 탭들은 저장된 세션을 함께 쓰므로 방금 자리를 가져간 탭까지
+   로그아웃됐다. 탭 둘을 열면 둘 다 풀리고, 다른 기기로 옮기면 새 기기도 곧 풀렸다.
+     · 같은 브라우저의 다른 탭 — 세션은 그 탭 것이기도 하다. 이 탭 화면만 로그아웃한다.
+     · 다른 기기 — 이 기기 세션만 끊는다(scope: local). 새 기기는 그대로 둔다.
+     · 모름(서버 대조로만 알게 됨, 또는 배포 전 코드가 돌던 탭이 브라우저 표 없이 알림) —
+       끊으면 같은 브라우저일 때 남까지 끊으니, 화면만 로그아웃한다.
+   화면만 로그아웃한 탭은 새로고침하거나 다시 로그인하면 자리를 도로 가져간다 — 나중에 쓴 쪽이 이긴다. */
+async function kicked(from = "unknown") {
+  kickListeners.forEach((fn) => { try { fn(from); } catch (e) { console.error(e); } });
+  if (from === "device") {
+    const sb = await client();
+    if (sb) await sb.auth.signOut({ scope: "local" });
+  }
+  leaveSeat();
 }
 
 /** 중요한 쓰기 직전에 이 기기가 아직 유효한 자리인지 확인한다.
