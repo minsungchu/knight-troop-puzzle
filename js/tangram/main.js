@@ -104,7 +104,8 @@ function focusChanged(f) {
     f.type === "piece" ? "줍기" :
     f.type === "npc" ? "말 걸기" :
     f.type === "basket" ? "바구니에 넣기" :
-    carried().length ? "제단에 올리기" : "맞추기";
+    carried().length ? "제단에 올리기" :
+    run.pieces.some((p) => p.at === "altar") ? "맞추기" : "조각을 모아 와요";
   b.textContent = label;
   b.disabled = !f;
   b.classList.toggle("ready", !!f);

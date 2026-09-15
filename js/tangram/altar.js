@@ -94,6 +94,9 @@ export function open(o) {
 /** 판을 닫는다. quiet 면 onClose 를 부르지 않는다. */
 export function close(quiet) {
   if (!s) return;
+  // 다 맞춘 뒤 축하가 끝나기 전(0.9초)에 나가기·Esc·탭 이동이 오면 무시한다. 그대로 닫으면
+  // 기다리던 onSolved 가 불리지 않아 깬 퀘스트가 기록 없이 사라진다. 끝내는 쪽은 quiet 로 닫는다.
+  if (s.done && !quiet) return;
   const cur = s;
   s = null;
   for (const g of cur.meshes.values()) W.remove(g);
