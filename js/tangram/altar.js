@@ -59,12 +59,12 @@ export function open(o) {
   W.showFrame(o.zone, null);
   const fm = W.frameMesh(frame, o.quest.guide);
   const fc = toWorld((box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2);
-  fm.position.set(fc[0], TOP - 0.02, fc[1]);
+  fm.position.set(fc[0], TOP - 0.005, fc[1]);        // 조각 바로 밑 — 높이 차가 크면 원근 때문에 크기가 달라 보인다
   W.add(fm);
   s.frameMesh = fm;
 
   for (const p of o.pieces) {
-    const g = W.pieceMesh(p.kind, p.color);
+    const g = W.pieceMesh(p.kind, p.color, W.U, true);
     W.add(g);
     s.meshes.set(p.id, g);
   }
@@ -131,12 +131,13 @@ function draw() {
   s.order.forEach((p, i) => {
     const g = s.meshes.get(p.id);
     const [x, z] = toWorld(p.place.x, p.place.y);
-    // 끄는 조각은 높이 들고, 골라 둔 조각은 살짝 띄운다 — 돌리기 단추가 어느 조각에 먹는지 보이게
-    const lift = s.drag && s.drag.moved && s.drag.p === p ? 0.35 : s.sel === p ? 0.12 : 0;
-    g.position.set(x, TOP + i * 0.01 + lift, z);
+    // 조각은 틀과 같은 높이에 눕힌다. 띄우면 원근 때문에 틀보다 커 보인다 — 끄는 동안만 아주 조금 든다.
+    // 골라 둔 조각은 띄우는 대신 밝게 비춰 돌리기 단추가 어느 조각에 먹는지 보인다.
+    const lift = s.drag && s.drag.moved && s.drag.p === p ? 0.04 : 0;
+    g.position.set(x, TOP + i * 0.004 + lift, z);
     W.posePiece(g, p.place.rot, p.place.flip);
     const snug = s.quest.guide && s.frame.some((f) => fits(p.place, f));
-    g.userData.inner.material.emissive.setHex(s.sel === p ? 0x4a4a4a : snug ? 0x16402c : 0);
+    g.userData.inner.material.emissive.setHex(s.sel === p ? 0x5a5a5a : snug ? 0x16402c : 0);
   });
 }
 
