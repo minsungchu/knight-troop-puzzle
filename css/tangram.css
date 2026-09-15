@@ -1,0 +1,81 @@
+/* 칠교 마을 — 3D 무대와 그 위에 뜨는 안내.
+   바깥 틀은 다른 게임과 같은 어두운 테마, 무대 안은 밝은 동화풍이다. */
+
+.tg-stage{
+  position:relative; margin-top:14px; border-radius:14px; overflow:hidden;
+  height:clamp(420px, calc(100vh - 220px), 760px); height:clamp(420px, calc(100dvh - 220px), 760px);
+  background:#bfe6ff; border:1px solid rgba(201,151,63,.35);
+  touch-action:none; user-select:none; -webkit-user-select:none;
+}
+.tg-stage canvas{display:block; width:100%; height:100%}
+.tg-stage [hidden]{display:none !important}      /* 아래 display 규칙이 hidden 을 덮지 않게 */
+
+.tg-loading{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center;
+  color:#2b2d42; font-size:15px; line-height:1.8; background:#bfe6ff; z-index:5}
+
+/* 떠 있는 판 — 밝은 무대 위에 읽히도록 흰 바탕 */
+.tg-quest,.tg-altar,.tg-zone{
+  position:absolute; color:#2b2d42; background:rgba(255,255,255,.9); border-radius:12px;
+  box-shadow:0 6px 18px rgba(43,45,66,.18); font-family:var(--body);
+}
+.tg-quest{left:12px; top:12px; padding:9px 13px; max-width:min(320px, calc(100% - 24px)); z-index:3}
+.tg-quest-head{display:flex; align-items:center; gap:7px; font-size:14px}
+.tg-quest-head b{flex:1; min-width:0}
+.tg-clock{font-family:var(--mono); font-variant-numeric:tabular-nums; font-weight:700; color:#e76f51}
+.tg-quest-line{font-size:12.5px; color:#5c677d; margin-top:3px}
+
+.tg-zone{left:50%; top:18%; transform:translate(-50%, -8px); padding:10px 22px; font-family:var(--display);
+  font-size:20px; font-weight:700; opacity:0; transition:.35s; pointer-events:none; z-index:2}
+.tg-zone.show{opacity:1; transform:translate(-50%, 0)}
+
+/* 행동 단추 — 엄지로 누르기 좋게 크게 */
+.tg-action{
+  position:absolute; right:16px; bottom:16px; z-index:3; min-width:96px; height:96px; padding:0 14px;
+  border-radius:48px; border:3px solid #fff; font:700 17px var(--body); color:#fff;
+  background:#9aa5b1; box-shadow:0 6px 16px rgba(43,45,66,.28); cursor:pointer; transition:.15s;
+}
+.tg-action.ready{background:linear-gradient(#ffb347,#f77f00); transform:scale(1.04)}
+.tg-action:disabled{opacity:.6; cursor:default}
+.tg-action:focus-visible{outline:3px solid #2b2d42; outline-offset:2px}
+
+/* 조이스틱 — 손가락이 있는 기기에서만 */
+.tg-stick{
+  position:absolute; left:18px; bottom:18px; width:128px; height:128px; border-radius:50%; z-index:3;
+  background:rgba(255,255,255,.35); border:3px solid rgba(255,255,255,.8); display:none; touch-action:none;
+}
+.tg-knob{position:absolute; left:50%; top:50%; width:56px; height:56px; margin:-28px 0 0 -28px; border-radius:50%;
+  background:rgba(255,255,255,.95); box-shadow:0 3px 10px rgba(43,45,66,.3); pointer-events:none}
+@media (pointer:coarse){ .tg-stick{display:block} .tg-keys{display:none} }
+
+/* 제단 조작 막대 */
+.tg-altar{left:50%; bottom:12px; transform:translateX(-50%); padding:10px 12px; z-index:4;
+  width:max-content; max-width:calc(100% - 24px); text-align:center}
+.tg-altar-tip{margin:0 0 8px; font-size:13px; line-height:1.5}
+.tg-altar-btns{display:flex; flex-wrap:wrap; gap:6px; justify-content:center}
+.tg-altar .btn{font-size:14px; padding:9px 13px}
+.tg-altar kbd{font-family:var(--mono); font-size:10px; opacity:.6; margin-left:3px}
+@media (pointer:coarse){ .tg-altar kbd{display:none} }
+.tg-stage:has(.tg-altar:not([hidden])) .tg-action,
+.tg-stage:has(.tg-altar:not([hidden])) .tg-stick{display:none}
+
+.tg-keys{margin:8px 2px 0}
+
+/* 대화 창 */
+.tg-talk p{margin:0 0 10px; line-height:1.8; font-size:14.5px; text-align:left}
+.tg-talk b{color:var(--brass)}
+.tg-quest-title{font-family:var(--display); font-size:17px; color:var(--parch); margin:4px 0 12px}
+.tg-bang{display:inline-block; min-width:1.5em; text-align:center; border-radius:99px; background:#ffd166; color:#7a4a00 !important}
+.tg-replays{display:flex; flex-direction:column; gap:8px; margin:6px 0}
+.tg-replays .btn{display:flex; justify-content:space-between; gap:12px; text-align:left}
+.tg-result{text-align:center}
+.tg-time{font-family:var(--mono); font-size:34px; font-weight:700; color:var(--brass); margin:6px 0}
+.tg-reward{color:var(--u2); font-weight:700}
+.tg-mine{padding:12px 20px 0; margin:0}
+#tgRankQuests .chip{font-family:var(--body)}           /* 퀘스트 이름은 한글이라 라틴 장식체를 쓰지 않는다 */
+
+@media (max-width:520px){
+  /* 폰에서는 무대가 화면을 다 쓴다. 머리말은 위로 밀어 올리면 보인다(main.js 가 처음에 무대로 내려 준다). */
+  .tg-stage{height:calc(100dvh - 20px); min-height:380px; border-radius:10px; margin-top:10px}
+  .tg-action{min-width:84px; height:84px; font-size:15px; right:12px; bottom:12px}
+  .tg-stick{left:12px; bottom:12px; width:116px; height:116px}
+}

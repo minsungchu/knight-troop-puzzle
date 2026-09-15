@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>칠교 마을 — 조각을 모아 모양을 만드는 모험</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/theme.css">
+<link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/hub.css">
+<link rel="stylesheet" href="css/tangram.css">
+<!-- 3D 는 Three.js 를 CDN 에서 받는다. 판을 고정해 둬야 어느 날 갑자기 모양이 바뀌지 않는다. -->
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js" } }
+</script>
+</head>
+<body>
+<div class="wrap">
+  <header class="masthead">
+    <div class="brand">
+      <h1>칠교 마을</h1>
+      <div class="sub">TANGRAM VILLAGE · 8 QUESTS</div>
+    </div>
+
+    <nav class="tabs" role="tablist" aria-label="화면 전환">
+      <a class="tab tab-home" href="./" aria-label="게임 고르기로">◂ 게임</a>
+      <button class="tab on" data-tab="world" role="tab" aria-selected="true">모험</button>
+      <button class="tab" data-tab="rank" role="tab" aria-selected="false">순위</button>
+    </nav>
+
+    <div class="account" id="account"></div>
+  </header>
+
+  <div id="saveNote"></div>
+
+  <!-- ══════════════ 모험 ══════════════ -->
+  <section class="view" data-view="world">
+    <div class="tg-stage" id="tgStage">
+      <div class="tg-loading" id="tgLoading"><p>마을을 짓는 중…</p></div>
+
+      <div class="tg-quest" id="tgQuest" hidden>
+        <div class="tg-quest-head"><span>📜</span><b id="tgQuestTitle"></b><span class="tg-clock" id="tgClock">0:00</span></div>
+        <div class="tg-quest-line" id="tgQuestLine"></div>
+      </div>
+
+      <div class="tg-zone" id="tgZone" aria-live="polite"></div>
+
+      <div class="tg-stick" id="tgStick" aria-hidden="true"><div class="tg-knob" id="tgKnob"></div></div>
+      <button class="tg-action" id="tgAction" disabled>·</button>
+
+      <div class="tg-altar" id="tgAltarBar" hidden>
+        <p class="tg-altar-tip" id="tgAltarTip"></p>
+        <div class="tg-altar-btns">
+          <button class="btn" id="tgTurn">↻ 돌리기 <kbd>R</kbd></button>
+          <button class="btn" id="tgFlip">⇋ 뒤집기 <kbd>F</kbd></button>
+          <button class="btn" id="tgHint">💡 도움 <kbd>H</kbd></button>
+          <button class="btn primary" id="tgLeave">◂ 나가기</button>
+        </div>
+      </div>
+    </div>
+    <p class="hint tg-keys">방향키·WASD 걷기 · 스페이스 줍기/말 걸기 · 제단에서 끌어 옮기고 톡 눌러 돌리기</p>
+  </section>
+
+  <!-- ══════════════ 순위 ══════════════ -->
+  <section class="view" data-view="rank" hidden>
+    <div class="panel">
+      <div class="picker"><div class="picker-row" id="tgRankQuests"></div></div>
+      <div id="tgRankBody"></div>
+    </div>
+  </section>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="veil" id="veil"><div class="card" id="card"></div></div>
+
+<script type="module" src="js/tangram/main.js"></script>
+</body>
+</html>
