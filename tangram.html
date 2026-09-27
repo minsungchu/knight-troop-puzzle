@@ -26,7 +26,8 @@
 
     <nav class="tabs" role="tablist" aria-label="화면 전환">
       <a class="tab tab-home" href="./" aria-label="게임 고르기로">◂ 게임</a>
-      <button class="tab on" data-tab="world" role="tab" aria-selected="true">모험</button>
+      <button class="tab on" data-tab="world" role="tab" aria-selected="true">배우기</button>
+      <button class="tab" data-tab="adventure" role="tab" aria-selected="false">도전</button>
       <button class="tab" data-tab="rank" role="tab" aria-selected="false">순위</button>
     </nav>
 
@@ -61,6 +62,13 @@
       </div>
     </div>
     <p class="hint tg-keys">방향키·WASD 걷기 · 스페이스 줍기/말 걸기 · 제단에서 끌어 옮기고 톡 눌러 돌리기</p>
+  </section>
+
+  <!-- ══════════════ 도전 (어드벤처) ══════════════ -->
+  <section class="view" data-view="adventure" hidden>
+    <!-- 문제를 풀 때는 3D 무대를 이 자리로 옮겨 온다. 탭을 바꾸지 않으려는 것이다. -->
+    <div id="tgAdvStage" hidden></div>
+    <div class="panel" id="tgAdvPanel"><div id="tgAdvBody"></div></div>
   </section>
 
   <!-- ══════════════ 순위 ══════════════ -->

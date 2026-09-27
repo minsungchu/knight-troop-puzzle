@@ -13,6 +13,7 @@ import { ONLINE, uid } from "../supabase.js";
 import { KINDS } from "./shapes.js";
 import { QUESTS, NPCS, ZONES, SPOTS, BASKET, piecesOf, isOpen } from "./quests.js";
 import * as Progress from "./progress.js";
+import * as StageRec from "./stages.js";
 import * as Rank from "./rank.js";
 
 const CARRY_MAX = 3;
@@ -20,24 +21,34 @@ const HINT_MS = 15000;
 /* 같은 조각은 어느 퀘스트에서나 같은 색이다 — 큰 삼각형 둘, 중간, 작은 둘, 정사각형, 평행사변형 */
 const COLORS = { L: [0xef476f, 0x118ab2], M: [0x8e6cd8], S: [0x06d6a0, 0xffd166], Q: [0xf78c3b], P: [0x4cc9f0] };
 
-let W, Altar;
+let W, Altar, Adventure;
+let stageTab = "world";                // 3D 무대가 지금 어느 탭에 얹혀 있나
 let run = null;                        // { q, start, penalty, basket, pieces: [{id, kind, color, at, place, spot}] }
+let play = null;                       // 도전 한 판 { stage, start, hints, pieces }
 let seq = 0;
 
 $$(".tab[data-tab]").forEach((b) => { b.onclick = () => showTab(b.dataset.tab); });
 Sfx.listenForGesture();
 Auth.init();
 Progress.load();
-Saving.mount("#saveNote", { src: Progress, patch: "supabase/patch-08-tangram.sql", what: "모험 기록" });
+StageRec.load();
+Saving.mount("#saveNote", {
+  sources: [{ src: Progress, patch: "supabase/patch-08-tangram.sql" }, { src: StageRec, patch: "supabase/patch-09-tangram-stages.sql" }],
+  what: "모험·도전 기록",
+});
 Rank.init();
 onTab((name) => {
   if (name === "rank") Rank.render();
-  if (name !== "world" && Altar?.isOpen()) Altar.close();
+  if (name === "adventure") Adventure?.render();
+  // 무대가 얹힌 탭을 떠나면 풀던 판을 닫는다. 무대는 배우기와 도전 사이를 오간다.
+  if (name !== stageTab && Altar?.isOpen()) Altar.close();
 });
 
 /* Three.js 는 CDN 에서 온다. 못 받으면 화면에 말한다 — 정적 import 로 두면 모듈 전체가 조용히 죽는다. */
-Promise.all([import("./world.js"), import("./altar.js")]).then(([w, a]) => {
-  W = w; Altar = a;
+Promise.all([import("./world.js"), import("./altar.js"), import("./adventure.js")]).then(([w, a, adv]) => {
+  W = w; Altar = a; Adventure = adv;
+  Adventure.init({ onStart: startStage });
+  Adventure.render();
   W.init($("#tgStage"), { onFocus: focusChanged, onAction: act, onZone: zoneBanner });
   W.setFocusFilter((f) =>
     f.type === "altar" ? !!run && !run.q.sort && run.q.zone === f.zone
@@ -58,6 +69,54 @@ Promise.all([import("./world.js"), import("./altar.js")]).then(([w, a]) => {
 });
 
 document.addEventListener("tangram-progress", () => { if (W) { W.openBridges(Progress.cleared(), false); refreshMarks(); } });
+document.addEventListener("tangram-stages", () => Adventure?.render());
+
+/** 3D 무대를 탭 사이로 옮긴다. 도전 문제를 풀 때 배우기 탭으로 튕겨 나가지 않게 하려는 것이다.
+ *  캔버스는 DOM 을 옮겨도 그리던 것을 그대로 들고 있다. */
+function moveStage(tab) {
+  if (tab === stageTab) return;
+  const stage = $("#tgStage"), slot = $("#tgAdvStage"), keys = $(".tg-keys");
+  if (tab === "adventure") {
+    slot.hidden = false;
+    slot.append(stage, keys);
+    $("#tgAdvPanel").hidden = true;
+  } else {
+    $(".view[data-view='world']").prepend(stage);
+    stage.after(keys);
+    slot.hidden = true;
+    $("#tgAdvPanel").hidden = false;
+  }
+  stageTab = tab;
+}
+
+/* ══════════════ 도전 한 판 ══════════════
+   조각 모으기는 튜토리얼에서 끝났다. 여기서는 제단 화면만 열어 바로 맞춘다. */
+
+function startStage(stage) {
+  if (run) { toast(`먼저 「${run.q.title}」 부탁을 끝내 주세요.`); return; }
+  if (Altar.isOpen()) Altar.close(true);
+  moveStage("adventure");
+  const seen = {};
+  const pieces = stage.frame.map((f) => {
+    const n = (seen[f.k] = (seen[f.k] || 0) + 1) - 1;
+    return { id: ++seq, kind: f.k, color: COLORS[f.k][n], place: null };
+  });
+  play = { stage, start: performance.now(), hints: 0, pieces };
+  const quest = { frame: stage.frame, title: stage.name };
+  hud();
+  Altar.open({
+    zone: "village", quest, pieces,
+    onSolved: async () => {
+      const cur = play; play = null;
+      hud();
+      moveStage("world");
+      await Adventure.finish(cur.stage, Math.round(performance.now() - cur.start), cur.hints);
+      Adventure.render();
+    },
+    onClose: () => { play = null; hud(); moveStage("world"); W.refocus(); Adventure.render(); },
+    onHint: () => { if (play) play.hints++; toast("도움을 받았어요 — 별 하나로 끝나요"); },
+  });
+}
 
 /* ══════════════ 안내 ══════════════ */
 
@@ -147,7 +206,7 @@ function toAltar() {
   Altar.open({
     zone: run.q.zone, quest: run.q, pieces: onAltar,
     onSolved: finish,
-    onClose: () => { W.showFrame(run.q.zone, run.q.frame, run.q.guide); W.refocus(); hud(); },
+    onClose: () => { W.showFrame(run.q.zone, run.q.frame); W.refocus(); hud(); },
     onHint: () => { run.penalty += HINT_MS; toast(`도움을 받았어요 — 시간 +${HINT_MS / 1000}초`); },
   });
 }
@@ -250,7 +309,7 @@ function start(q) {
     }),
   };
   for (const p of run.pieces) W.drop(p, p.spot[0], p.spot[1]);
-  if (!q.sort) W.showFrame(q.zone, q.frame, q.guide);
+  if (!q.sort) W.showFrame(q.zone, q.frame);
   W.refocus();
   refreshMarks();
   hud();
@@ -312,7 +371,12 @@ function progressLine() {
 }
 
 function hud() {
-  $("#tgQuest").hidden = !run;
+  $("#tgQuest").hidden = !run && !play;
+  if (play) {
+    $("#tgQuestTitle").textContent = play.stage.name;
+    $("#tgQuestLine").textContent = `${Adventure.LEVEL[play.stage.difficulty].name} · 도움 ${play.hints}번`;
+    return;
+  }
   if (!run) return;
   $("#tgQuestTitle").textContent = run.q.title;
   $("#tgQuestLine").textContent = progressLine();
@@ -320,6 +384,7 @@ function hud() {
 
 setInterval(() => {
   if (run) $("#tgClock").textContent = fmt(performance.now() - run.start + run.penalty);
+  else if (play) $("#tgClock").textContent = fmt(performance.now() - play.start);
 }, 250);
 
 /* ══════════════ 조작 ══════════════ */

@@ -59,8 +59,35 @@ for (const q of QUESTS) {
 // 분류 퀘스트: 직각삼각형은 셋 모양 다섯 조각뿐
 ok(["L", "L", "M", "S", "S", "Q", "P"].filter((k) => KINDS[k].right).length === 5, "직각삼각형 조각 수가 5가 아니다");
 
+/* ── 도전(어드벤처) 스테이지 ── */
+{
+  const { VILLAGES, STAGES } = await import("../data/tangram-stages.js");
+  const SETKEY = ["L", "L", "M", "S", "S", "Q", "P"].slice().sort().join("");
+  ok(VILLAGES.length >= 10, `마을이 ${VILLAGES.length}곳 (10곳 이상이어야 한다)`);
+  ok(STAGES.length >= 100, `문제가 ${STAGES.length}개 (100개 이상이어야 한다)`);
+  ok(new Set(STAGES.map((s) => s.id)).size === STAGES.length, "스테이지 번호가 겹친다");
+  for (const v of VILLAGES) {
+    const list = STAGES.filter((s) => s.village === v.id);
+    ok(list.length === 10, `${v.id}: 문제 ${list.length}개 (10개여야 한다)`);
+    for (const [d, n] of [["easy", 3], ["mid", 3], ["hard", 4]]) {
+      ok(list.filter((s) => s.difficulty === d).length === n, `${v.id}: ${d} 문제 수가 ${n}개가 아니다`);
+    }
+  }
+  for (const st of STAGES) {
+    const tag = `스테이지 ${st.id}(${st.name})`;
+    ok(st.frame.map((f) => f.k).sort().join("") === SETKEY, `${tag}: 조각이 한 벌이 아니다`);
+    for (const f of st.frame) ok(kindOf(f.v) === f.k, `${tag}: ${f.k} 자리의 모양이 다르다`);
+    const sol = st.frame.map(placementFor);
+    ok(!sol.some((p) => !p), `${tag}: 놓을 수 없는 칸이 있다`);
+    if (sol.some((p) => !p)) continue;
+    ok(complete(st.frame, sol), `${tag}: 겹치거나 틈이 있다`);
+    ok(!complete(st.frame, sol.slice(1)), `${tag}: 조각이 빠졌는데 맞았다고 한다`);
+  }
+}
+
 if (bad.length) {
   console.error(bad.map((m) => "✗ " + m).join("\n"));
   process.exit(1);
 }
-console.log(`✓ 퀘스트 ${QUESTS.length}개 — 틀 모양·겹침·붙이기·판정 모두 통과`);
+const { STAGES } = await import("../data/tangram-stages.js");
+console.log(`✓ 퀘스트 ${QUESTS.length}개 · 도전 문제 ${STAGES.length}개 — 틀 모양·겹침·붙이기·판정 모두 통과`);
