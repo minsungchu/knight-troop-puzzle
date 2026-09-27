@@ -22,7 +22,7 @@ export const isOpen = () => !!s;
 
 /**
  * @param o.zone     제단이 있는 구역
- * @param o.quest    퀘스트 (frame, guide)
+ * @param o.quest    퀘스트 (frame, title)
  * @param o.pieces   제단에 올린 조각들 [{id, kind, color, place}] — place 가 없으면 받침에 둔다
  * @param o.onSolved 다 맞췄을 때
  * @param o.onClose  나가기

@@ -1,8 +1,8 @@
 /* 생성된 배치를 한 장에 모아 그린다 — 무엇처럼 보이는지 사람이 눈으로 고르라고.
  *
- *   node tools/tangram-gen.mjs --count 240 --seed 7 --out /tmp/gen.json
- *   node tools/tangram-sheet.mjs /tmp/gen.json /tmp/sheet.html
  *   node tools/tangram-sheet.mjs data/tangram-stages.js /tmp/stages.html --stages
+ *
+ * 밑그림과 실제 배치를 나란히 보려면 tools/art-preview.mjs 를 쓴다.
  *
  * 실루엣만 칠한다(조각 경계선 없음). 아이가 어려움 단계에서 보는 그림이 이것이다.
  */
