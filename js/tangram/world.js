@@ -455,27 +455,24 @@ export function openBridges(cleared, animate) {
 }
 
 /** 제단 위 틀. slots 가 null 이면 지운다. */
-export function showFrame(zone, slots, guide) {
+export function showFrame(zone, slots) {
   const f = altars[zone].frame;
   f.clear();
-  if (slots) f.add(frameMesh(slots, guide));
+  if (slots) f.add(frameMesh(slots));
 }
 
-/* 틀을 그린다 — 짙은 그림자, 안내선이 있으면 조각 경계까지. 틀 가운데가 원점. */
-export function frameMesh(slots, guide) {
+/* 틀을 그린다 — 짙은 그림자뿐이다. 틀 가운데가 원점.
+   조각 경계선은 긋지 않는다. 선을 그어 주면 어디에 무엇을 놓을지 다 알려 주는 셈이라
+   문제가 아니게 된다. 난이도는 모양 자체의 복잡도로 준다. */
+export function frameMesh(slots) {
   const g = new THREE.Group();
   const [cx, cy] = frameCenter(slots);
   const shade = new THREE.MeshBasicMaterial({ color: 0x3d405b, transparent: true, opacity: 0.62, depthWrite: false });
-  const line = new THREE.LineBasicMaterial({ color: 0xffffff });
   for (const s of slots) {
     const pts = s.v.map(([x, y]) => new THREE.Vector2((x - cx) * U, (y - cy) * U));
     const m = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape(pts)), shade);
     m.rotation.x = -Math.PI / 2;
     g.add(m);
-    if (guide) {
-      const lg = new THREE.BufferGeometry().setFromPoints([...pts, pts[0]].map((p) => new THREE.Vector3(p.x, 0.01, -p.y)));
-      g.add(new THREE.Line(lg, line));
-    }
   }
   return g;
 }

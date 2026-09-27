@@ -57,7 +57,7 @@ export function open(o) {
 
   // 월드에 걸린 틀 미리보기는 치우고, 이 판의 좌표에 맞춰 다시 그린다
   W.showFrame(o.zone, null);
-  const fm = W.frameMesh(frame, o.quest.guide);
+  const fm = W.frameMesh(frame);
   const fc = toWorld((box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2);
   fm.position.set(fc[0], TOP - 0.005, fc[1]);        // 조각 바로 밑 — 높이 차가 크면 원근 때문에 크기가 달라 보인다
   W.add(fm);
@@ -85,9 +85,7 @@ export function open(o) {
   $("#tgTurn").onclick = () => turn(1, false);
   $("#tgHint").onclick = hint;
   $("#tgLeave").onclick = () => close();
-  $("#tgAltarTip").innerHTML = o.quest.guide
-    ? "조각을 <b>끌어서</b> 하얀 선 안에 놓으세요. <b>톡 누르면</b> 돌아갑니다."
-    : "이번엔 <b>윤곽만</b> 있어요. 조각을 끌어 모양을 채우세요. <b>톡 누르면</b> 돌아갑니다.";
+  $("#tgAltarTip").innerHTML = "조각을 <b>끌어서</b> 윤곽을 채우세요. <b>톡 누르면</b> 돌아갑니다.";
   syncButtons();
 }
 
@@ -136,8 +134,8 @@ function draw() {
     const lift = s.drag && s.drag.moved && s.drag.p === p ? 0.04 : 0;
     g.position.set(x, TOP + i * 0.004 + lift, z);
     W.posePiece(g, p.place.rot, p.place.flip);
-    const snug = s.quest.guide && s.frame.some((f) => fits(p.place, f));
-    g.userData.inner.material.emissive.setHex(s.sel === p ? 0x5a5a5a : snug ? 0x16402c : 0);
+    // 제자리에 들어갔다고 빛나게 하지 않는다 — 그것도 정답을 알려 주는 것이다.
+    g.userData.inner.material.emissive.setHex(s.sel === p ? 0x5a5a5a : 0);
   });
 }
 
